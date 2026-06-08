@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cloudbeds": {
+      "command": "node",
+      "args": [
+        "--env-file=C:\\Users\\Kyle Estocapio\\Git-Claude\\cloudbeds_mcp02\\cloudbeds-mcp\\.env",
+        "C:\\Users\\Kyle Estocapio\\Git-Claude\\cloudbeds_mcp02\\cloudbeds-mcp\\dist\\index.js"
+      ]
+    }
+  }
+}

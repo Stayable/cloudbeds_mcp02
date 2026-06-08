@@ -1,0 +1,31 @@
+{
+  "name": "cloudbeds-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Model Context Protocol server for the Cloudbeds PMS API (RISE8 / Stayable)",
+  "type": "module",
+  "bin": {
+    "cloudbeds-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

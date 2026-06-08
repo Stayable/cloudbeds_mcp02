@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  INVESTOR
+  ADMIN
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD
+  DEVELOPMENT
+  PENDING
+}
+
+enum PropertyType {
+  MULTIFAMILY
+  OFFICE
+  RETAIL
+  INDUSTRIAL
+  MIXED_USE
+  LAND
+}
+
+enum DocumentCategory {
+  K1
+  STATEMENT
+  REPORT
+  LEGAL
+  TAX
+  OTHER
+}
+
+enum CapitalActivityType {
+  CALL
+  DISTRIBUTION
+}
+
+enum CapitalActivityStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum CommunicationType {
+  ANNOUNCEMENT
+  QUARTERLY_UPDATE
+  MEETING
+  GENERAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  role      UserRole @default(INVESTOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions           Session[]
+  magicLinks         MagicLink[]
+  investments        Investment[]
+  documentAccess     DocumentAccess[]
+  capitalActivities  CapitalActivity[]
+  communicationReads CommunicationRead[]
+  communications     Communication[]     @relation("CommunicationAuthor")
+  uploadedDocuments  Document[]          @relation("DocumentUploader")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [email], references: [email])
+
+  @@index([token])
+  @@index([email])
+}
+
+model Property {
+  id          String         @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  type        PropertyType
+  status      PropertyStatus @default(ACTIVE)
+  description String?
+  imageUrl    String?
+  totalValue  Float
+  totalUnits  Int?
+  squareFeet  Int?
+  yearBuilt   Int?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  investments       Investment[]
+  documents         Document[]
+  capitalActivities CapitalActivity[]
+}
+
+model Investment {
+  id               String   @id @default(cuid())
+  userId           String
+  propertyId       String
+  amount           Float
+  ownershipPercent Float
+  investmentDate   DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+}
+
+model Document {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  category    DocumentCategory
+  filePath    String
+  fileSize    Int
+  mimeType    String
+  year        Int?
+  propertyId  String?
+  uploadedBy  String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  property       Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  uploader       User             @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+  documentAccess DocumentAccess[]
+
+  @@index([category])
+  @@index([propertyId])
+  @@index([year])
+}
+
+model DocumentAccess {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  accessedAt DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([userId])
+}
+
+model CapitalActivity {
+  id          String                @id @default(cuid())
+  userId      String
+  propertyId  String?
+  type        CapitalActivityType
+  status      CapitalActivityStatus @default(PENDING)
+  amount      Float
+  description String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([propertyId])
+  @@index([type])
+  @@index([status])
+}
+
+model Communication {
+  id        String            @id @default(cuid())
+  title     String
+  content   String
+  type      CommunicationType
+  authorId  String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  author User                @relation("CommunicationAuthor", fields: [authorId], references: [id])
+  reads  CommunicationRead[]
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+model CommunicationRead {
+  id              String   @id @default(cuid())
+  communicationId String
+  userId          String
+  readAt          DateTime @default(now())
+
+  communication Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communicationId, userId])
+  @@index([communicationId])
+  @@index([userId])
+}
