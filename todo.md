@@ -32,8 +32,10 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 - [ ] 🟡 Deploy/run → hit `/api/ttlock-test` (needs networked machine — sandbox blocks TTLock)
 
 ### Phase 3 — Database (Prisma on Neon)
-- [ ] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog`
-- [ ] 🟡 `prisma migrate` against Neon
+- [x] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog` (`middleware/prisma/schema.prisma`)
+      + `lib/db.ts` singleton; prisma generate + build pass. UNCOMMITTED (held so it
+      doesn't churn the in-flight Vercel deploy of 791ea00).
+- [ ] 🟡 P0 Provision Neon → set `DATABASE_URL` → `prisma migrate` / `db push`
 
 ### Phase 4 — middleware: webhook (core)
 - [ ] 🟢 P0 `lib/webhook-auth.ts` — HMAC verify

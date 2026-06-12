@@ -53,5 +53,6 @@ No secrets or full tokens are ever returned — only previews and a count.
   unique within the account — no per-property routing.
 - Auth: OAuth2 password grant, password MD5-hashed. Tokens last ~90 days and are
   cached in-process; durable caching + scheduled refresh is a tracked follow-up.
-- EU gateway `euopen.ttlock.com`. Period passcodes use `keyboardPwdType=3`;
+- EU API gateway `euapi.ttlock.com` (NOT `euopen.ttlock.com` — that's the
+  docs/portal and 404s on API calls). Period passcodes use `keyboardPwdType=3`;
   push via gateway uses `addType=2` / `deleteType=2`.

@@ -95,7 +95,9 @@ Critical facts (mirror the per-property-key discipline above):
 - Webhook is **HMAC-verified** (`WEBHOOK_SECRET`). A `passcode` table stores the TTLock
   `keyboardPwdId` so checkout/cancel can actually delete the PIN.
 - TTLock auth: OAuth password grant, **MD5-hashed** password, token cached (~90-day expiry).
-- TTLock endpoint: `euopen.ttlock.com` (EU). TTLock plan upgrade required at 912+ locks
+- TTLock API gateway: `euapi.ttlock.com` (EU) — NOT `euopen.ttlock.com`, which is
+  the docs/portal where the app/client_id is registered and 404s on `/oauth2/token`
+  (build-guide error, fixed). TTLock plan upgrade required at 912+ locks
   (Stayable ≈ 1,450).
 - Secrets in `middleware/.env.local` (gitignored): `TTLOCK_CLIENT_ID/SECRET/USERNAME/PASSWORD`,
   `WEBHOOK_SECRET`, `CLOUDBEDS_ACCESS_TOKEN`, plus Neon `DATABASE_URL`.

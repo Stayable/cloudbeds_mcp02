@@ -9,12 +9,14 @@
  * Tokens last ~90 days; we cache the token in-process and re-fetch on expiry.
  * (A durable cache / scheduled refresh is a tracked follow-up — see the spec.)
  *
- * EU gateway: euopen.ttlock.com.
+ * EU API gateway: euapi.ttlock.com. (Note: euopen.ttlock.com is the developer
+ * PORTAL/docs where the app/client_id is registered — it is NOT the API host and
+ * returns 404 on /oauth2/token. All token + /v3 calls go to euapi.ttlock.com.)
  */
 
 import { createHash } from "node:crypto";
 
-const TTLOCK_BASE = process.env.TTLOCK_BASE_URL ?? "https://euopen.ttlock.com";
+const TTLOCK_BASE = process.env.TTLOCK_BASE_URL ?? "https://euapi.ttlock.com";
 
 // Refresh a little before the real expiry so we never present a stale token.
 const EXPIRY_SKEW_MS = 5 * 60 * 1000; // 5 minutes

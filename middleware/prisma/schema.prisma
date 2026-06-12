@@ -1,0 +1,56 @@
+// Stayable Lock Middleware — data model (Neon Postgres).
+// Shared with the lock-app project: the DB is the integration point between the
+// headless middleware and the management UI (Vercel can't import across siblings).
+//
+// Key invariant: room IDs are unique only WITHIN a Cloudbeds property, but all
+// locks live in one TTLock account. So the room->lock map is keyed by the
+// composite (propertyId, roomId), never roomId alone.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model LockMap {
+  id         String   @id @default(cuid())
+  propertyId String // real Cloudbeds propertyID, e.g. "210972"
+  roomId     String // Cloudbeds room id (unique only within a property)
+  lockId     BigInt // TTLock lock id (globally unique in the account)
+  alias      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([propertyId, roomId])
+}
+
+model Passcode {
+  id            String   @id @default(cuid())
+  reservationId String
+  propertyId    String
+  roomId        String
+  lockId        BigInt
+  keyboardPwdId BigInt // REQUIRED to delete the PIN later
+  pin           String
+  startTs       BigInt // unix ms
+  endTs         BigInt
+  status        String // active | revoked | failed
+  createdAt     DateTime @default(now())
+
+  @@index([reservationId])
+}
+
+model EventLog {
+  id         String   @id @default(cuid())
+  source     String // webhook | admin | field
+  event      String
+  propertyId String?
+  roomId     String?
+  lockId     BigInt?
+  action     String // passcode_created | passcode_revoked | no_lock_mapped | ...
+  detail     Json?
+  createdAt  DateTime @default(now())
+}
