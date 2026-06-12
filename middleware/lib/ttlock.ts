@@ -38,7 +38,9 @@ function requiredEnv(name: string): string {
   if (!v) {
     throw new Error(`Missing required env var: ${name}`);
   }
-  return v;
+  // Trim: pasting secrets into a dashboard often leaves trailing whitespace or a
+  // stray newline, which silently breaks the MD5 password and yields a 10007.
+  return v.trim();
 }
 
 /** TTLock requires the account password as a lowercase MD5 hex digest. */
