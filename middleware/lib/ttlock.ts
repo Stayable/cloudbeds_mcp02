@@ -1,0 +1,186 @@
+/**
+ * TTLock Cloud API client — RISE8 / Stayable.
+ *
+ * One TTLock account, one Application ("Stayable Access — main") owns every lock
+ * across all 8 properties. Lock IDs are globally unique within the account, so no
+ * per-property routing here (unlike the Cloudbeds 8-account model).
+ *
+ * Auth is OAuth2 password grant with an MD5-hashed password (TTLock requirement).
+ * Tokens last ~90 days; we cache the token in-process and re-fetch on expiry.
+ * (A durable cache / scheduled refresh is a tracked follow-up — see the spec.)
+ *
+ * EU gateway: euopen.ttlock.com.
+ */
+
+import { createHash } from "node:crypto";
+
+const TTLOCK_BASE = process.env.TTLOCK_BASE_URL ?? "https://euopen.ttlock.com";
+
+// Refresh a little before the real expiry so we never present a stale token.
+const EXPIRY_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CachedToken {
+  accessToken: string;
+  refreshToken: string;
+  uid: number;
+  /** Absolute epoch-ms after which the token must be re-fetched. */
+  expiresAt: number;
+}
+
+// Module-level cache. Survives within a warm serverless instance; a cold start
+// simply re-authenticates, which is cheap relative to the ~90-day token life.
+let cached: CachedToken | null = null;
+
+function requiredEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) {
+    throw new Error(`Missing required env var: ${name}`);
+  }
+  return v;
+}
+
+/** TTLock requires the account password as a lowercase MD5 hex digest. */
+function md5(input: string): string {
+  return createHash("md5").update(input).digest("hex");
+}
+
+/**
+ * TTLock returns HTTP 200 even on logical errors, carrying an `errcode` in the
+ * body (0 = success). Normalize that into a thrown Error for non-zero codes.
+ */
+function assertOk(body: any, context: string): void {
+  if (body && typeof body.errcode === "number" && body.errcode !== 0) {
+    throw new Error(
+      `TTLock ${context} failed: errcode=${body.errcode} ${body.errmsg ?? ""}`.trim(),
+    );
+  }
+}
+
+async function postForm(path: string, params: Record<string, string | number>): Promise<any> {
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    form.set(k, String(v));
+  }
+  const res = await fetch(`${TTLOCK_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+  if (!res.ok) {
+    throw new Error(`TTLock ${path} HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch (or return the cached) TTLock OAuth access token.
+ * Uses the password grant with an MD5-hashed password.
+ */
+export async function getTTLockToken(force = false): Promise<CachedToken> {
+  if (!force && cached && Date.now() < cached.expiresAt - EXPIRY_SKEW_MS) {
+    return cached;
+  }
+
+  const clientId = requiredEnv("TTLOCK_CLIENT_ID");
+  const clientSecret = requiredEnv("TTLOCK_CLIENT_SECRET");
+  const username = requiredEnv("TTLOCK_USERNAME");
+  const password = requiredEnv("TTLOCK_PASSWORD");
+
+  const body = await postForm("/oauth2/token", {
+    clientId,
+    clientSecret,
+    username,
+    password: md5(password),
+    grant_type: "password",
+  });
+
+  // The token endpoint reports failure via `errcode`, not `errcode === 0`.
+  if (!body.access_token) {
+    throw new Error(
+      `TTLock auth failed: ${body.errcode ?? "?"} ${body.errmsg ?? "no access_token returned"}`,
+    );
+  }
+
+  cached = {
+    accessToken: body.access_token,
+    refreshToken: body.refresh_token,
+    uid: body.uid,
+    // expires_in is in seconds.
+    expiresAt: Date.now() + Number(body.expires_in) * 1000,
+  };
+  return cached;
+}
+
+/**
+ * Count locks visible to this Application. CRITICAL CHECK: if the client_id is
+ * an "old" app instead of `main`, auth succeeds but this returns 0 — that is the
+ * symptom the spec warns about. A non-zero count confirms the right app.
+ */
+export async function listLocks(pageNo = 1, pageSize = 100): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/list", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "lock/list");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
+export interface CreatePasscodeArgs {
+  lockId: number | bigint;
+  /** 4-9 digit PIN. */
+  passcode: string;
+  /** Validity window, epoch-ms. */
+  startDate: number;
+  endDate: number;
+  /** Optional human label shown in the TTLock app. */
+  name?: string;
+}
+
+/**
+ * Create a period (time-limited) keyboard passcode on a lock.
+ * keyboardPwdType=3 => period passcode. addType=2 => push via gateway/WiFi.
+ * Returns the `keyboardPwdId`, which MUST be stored to delete the PIN later.
+ */
+export async function createPasscode(args: CreatePasscodeArgs): Promise<{ keyboardPwdId: number }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/keyboardPwd/add", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(args.lockId),
+    keyboardPwd: args.passcode,
+    keyboardPwdName: args.name ?? "",
+    keyboardPwdType: 3,
+    startDate: args.startDate,
+    endDate: args.endDate,
+    addType: 2,
+    date: Date.now(),
+  });
+  assertOk(body, "keyboardPwd/add");
+  if (typeof body.keyboardPwdId !== "number") {
+    throw new Error("TTLock keyboardPwd/add returned no keyboardPwdId");
+  }
+  return { keyboardPwdId: body.keyboardPwdId };
+}
+
+export interface DeletePasscodeArgs {
+  lockId: number | bigint;
+  keyboardPwdId: number | bigint;
+}
+
+/** Delete a previously created passcode. deleteType=2 => via gateway/WiFi. */
+export async function deletePasscode(args: DeletePasscodeArgs): Promise<void> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/keyboardPwd/delete", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(args.lockId),
+    keyboardPwdId: String(args.keyboardPwdId),
+    deleteType: 2,
+    date: Date.now(),
+  });
+  assertOk(body, "keyboardPwd/delete");
+}

@@ -1,10 +1,93 @@
 # Cloudbeds MCP — TODO
 
+## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
+Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
+Status: **spec APPROVED. Phase 2 scaffolded + builds clean.**
+RESUME HERE (2026-06-12): Phase 2 done — `middleware/` scaffolded (Next 14 + TS),
+`lib/ttlock.ts` (MD5 password, cached token, listLocks, create/deletePasscode),
+`GET /api/ttlock-test`. `npm run typecheck` + `npm run build` both pass locally.
+NEXT (needs networked machine — sandbox blocks `euopen.ttlock.com`): run
+`npm run dev` in `middleware/`, `curl /api/ttlock-test`. Success = `lockCount > 0`
+(`isMainApp: true`) — that confirms `client_id` is the `main` app. `auth:success`
++ `lockCount:0` = wrong/old app OR no locks registered yet. Then Phase 3 (Prisma/Neon).
+Still needed: `WEBHOOK_SECRET`, provision Neon. CLAUDE.md + todo.md UNCOMMITTED.
+Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site · P0 = critical path
+
+### Phase 0 — Prereqs
+- [ ] 🟡 P0 Verify `client_id 4ec9049d…` is the **`main`** app, not an "old" one
+      → now testable: run `/api/ttlock-test`, check `lockCount > 0` / `isMainApp`
+- [x] 🟢 TTLock creds in `middleware/.env.local`
+- [ ] 🟡 P0 Generate long random `WEBHOOK_SECRET` → `.env.local`
+- [ ] 🟡 Confirm `admin@rentstayable.com` owns the locks
+
+### Phase 1 — Infrastructure (remote)
+- [ ] 🟡 P0 Provision **Neon Postgres** via Vercel Marketplace
+- [ ] 🟡 Create 2 Vercel projects → Root Dirs `middleware/`, `lock-app/`
+- [ ] 🟡 Connect the one Neon DB to both projects (shared `DATABASE_URL`)
+
+### Phase 2 — middleware: TTLock auth (validates creds) ⭐
+- [x] 🟢 P0 Scaffold `middleware/` (Next 14 + TS) — typecheck + build pass
+- [x] 🟢 P0 `lib/ttlock.ts` — token (MD5 password) + cache, listLocks, create/deletePasscode
+- [x] 🟢 P0 `GET /api/ttlock-test` → returns auth status, uid, lockCount, isMainApp
+- [ ] 🟡 Deploy/run → hit `/api/ttlock-test` (needs networked machine — sandbox blocks TTLock)
+
+### Phase 3 — Database (Prisma on Neon)
+- [ ] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog`
+- [ ] 🟡 `prisma migrate` against Neon
+
+### Phase 4 — middleware: webhook (core)
+- [ ] 🟢 P0 `lib/webhook-auth.ts` — HMAC verify
+- [ ] 🟢 P0 `POST /api/cloudbeds-webhook` — map lookup, create/delete PIN, store `keyboardPwdId`, log
+- [ ] 🟡 P0 Validate against a **real Cloudbeds webhook payload** (guide field names are assumed)
+
+### Phase 5 — lock-app: management UI (parallel once DB exists)
+- [ ] 🟢 Scaffold `lock-app/` (reuse `client-portal` magic-link auth)
+- [ ] 🟢 Admin: LockMap CRUD, view/revoke/issue PINs, event log
+- [ ] 🟢 Field (mobile): room lookup → current PIN, mark lock registered
+
+### Phase 6 — Cloudbeds webhook registration
+- [ ] 🟡 Register webhook in all **8** Cloudbeds accounts → 1 endpoint
+- [ ] 🟡 Resolve property identity per payload
+
+### Phase 7 — End-to-end live test
+- [ ] 🔴 P0 Gerardo registers 1 test lock to `main`; read its Lock ID
+- [ ] 🟡 Map (property,room)→lockId; live reservation → PIN opens door → checkout deletes it
+
+### Phase 8 — Hardening (tracked, not v1)
+- [ ] Guest PIN delivery (Cloudbeds messaging/SMS) · token auto-refresh (90-day) · error alerting · TTLock plan upgrade at 912+ locks
+
+### Blocked on others
+- **Gerardo (on-site):** register locks to `main` (ignore old apps); read Lock IDs;
+  devicethread→Stayable transfer for 5 installed properties; 1 test lock now.
+- **Procurement:** TTLock plan tier for 912+ locks.
+
+### Property lock counts (from build guide, 2026-06-11)
+| Property | Cloudbeds ID | Locks | Lock status |
+|----------|-------------|-------|-------------|
+| Lakeland | 210972 | 176 | devicethread — transfer needed |
+| St. Augustine | 208155 | 163 | devicethread — transfer needed |
+| Davenport | 318197 | 178 | devicethread — transfer needed |
+| Kissimmee East | 210986 | 206 | devicethread — transfer needed |
+| Jacksonville West | 210987 | 189 | devicethread — transfer needed |
+| Kissimmee West | 210969 | 176 | not yet purchased — register direct |
+| Orlando OBT | 210971 | 214 | not yet purchased — register direct |
+| Jacksonville North | 206628 | 150 | not yet purchased — ownership TBD |
+
+---
+
+## In Progress (as of 2026-06-09)
+- **Stayable Vercel deploy** — importing `Stayable/cloudbeds_mcp02`. Hit
+  "No Next.js version detected" → cause is **Root Directory not set to
+  `cloudbeds-mcp-server`** (repo root has no package.json). Confirmed the pushed
+  commit has `cloudbeds-mcp-server/package.json` with `next ^14.2.0`. Fix: set
+  Root Directory = `cloudbeds-mcp-server` (Settings → Build & Deployment), then
+  redeploy. Awaiting confirmation that this cleared the error.
+
 ## Current Sprint — local DONE, now launch on Stayable Vercel
 - [x] **All 8 keys validated LIVE** — registry routing + getHotelDetails read
       confirmed for every property using the real Cloudbeds IDs.
-- [ ] **Commit + push code to `Stayable/cloudbeds_mcp02`** (awaiting Kyle's go-ahead)
-      so Stayable Vercel can import it. No secrets committed (.env is gitignored).
+- [x] **Committed + pushed to `Stayable/cloudbeds_mcp02`** (commit 2fabb65, default
+      branch claude/brave-maxwell-756k2c). No secrets committed.
 - [ ] **Create Stayable Vercel project** — import repo, Root Directory =
       `cloudbeds-mcp-server`, add env vars (8 keys keyed by REAL Cloudbeds ID +
       MCP_BEARER_TOKEN), deploy, disable Deployment Protection.

@@ -1,13 +1,18 @@
 # Cloudbeds MCP — Claude Code Instructions
 
 ## Project Overview
-A monorepo (RISE8 / Stayable) containing three independently deployable apps:
+A monorepo (RISE8 / Stayable) containing independently deployable apps:
 1. **`cloudbeds-mcp/`** — a local **stdio** MCP server exposing the Cloudbeds PMS
    API (v1.2) as tools for Claude Desktop/Code.
 2. **`cloudbeds-mcp-server/`** — the same toolset served over **HTTP** (Streamable
    HTTP via `mcp-handler` in a Next.js route), bearer-token gated, deployable to Vercel.
 3. **`client-portal/`** — a Next.js + Prisma investor portal with magic-link auth
    (RISE8 capital/portfolio/communications/documents for investors).
+4. **`middleware/`** — *(in progress)* headless TTLock ↔ Cloudbeds webhook service:
+   auto-creates/deletes guest door PINs from Cloudbeds reservation events.
+   Replaces devicethread SmartAccess. Vercel-deployable.
+5. **`lock-app/`** — *(planned)* role-based UI (admin + on-site field) to manage the
+   room→lock mapping and inspect/override PINs. Shares the middleware's Neon DB.
 
 Both MCP packages expose the **same 15 Cloudbeds tools**, validated against the
 official `pms-v1.2-openapi.yaml` spec. Read tools are always on; write tools are
@@ -69,10 +74,37 @@ returns the real IDs + names for discovery.
 **Write (only when `CLOUDBEDS_ALLOW_WRITES=true`):** `post_reservation_note`,
 `post_payment`, `put_reservation_status`.
 
+## TTLock Middleware + Lock App (in progress — see spec)
+Design spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`.
+Two new Vercel projects (`middleware/`, `lock-app/`) sharing **one Neon Postgres**
+(Prisma). The DB is the integration point — Vercel can't import across sibling
+folders, so the apps share *data*, not code (same constraint as the MCP pair).
+
+Critical facts (mirror the per-property-key discipline above):
+- **TTLock = 1 account, 1 Application = "Stayable Access — main".** Locks are
+  globally unique within that account; do NOT split per property. Two "old" apps
+  (Jax West, Orlando) are abandoned — Gerardo must register every lock to `main`.
+  `client_id 4ec9049d80234753b2238b28231da1a1` — **verify it's `main`, not an old app**
+  (auth succeeds but returns zero locks if wrong).
+- **Asymmetry is correct:** 1 TTLock account vs 8 Cloudbeds accounts. Cloudbeds maps
+  to PMS billing (genuinely 8); TTLock is an access vendor (no per-property split).
+- **Webhook registered 8× (once per Cloudbeds account) → 1 endpoint.** Payload must
+  carry property identity; the room→lock map is keyed by **(propertyID, roomID)**
+  because room IDs are unique only within a property but all map into one TTLock account.
+- **Map lives in the DB, NOT a static `roomLockMap.js`** — the lock-app edits it at runtime.
+- Webhook is **HMAC-verified** (`WEBHOOK_SECRET`). A `passcode` table stores the TTLock
+  `keyboardPwdId` so checkout/cancel can actually delete the PIN.
+- TTLock auth: OAuth password grant, **MD5-hashed** password, token cached (~90-day expiry).
+- TTLock endpoint: `euopen.ttlock.com` (EU). TTLock plan upgrade required at 912+ locks
+  (Stayable ≈ 1,450).
+- Secrets in `middleware/.env.local` (gitignored): `TTLOCK_CLIENT_ID/SECRET/USERNAME/PASSWORD`,
+  `WEBHOOK_SECRET`, `CLOUDBEDS_ACCESS_TOKEN`, plus Neon `DATABASE_URL`.
+
 ## Current Focus
-Wiring this repo up locally and operationalizing the deployed HTTP MCP server.
-Outstanding: PR #8 merge decision, deployment config in Vercel, adding the
-remaining 7 property keys, secret rotation. See `todo.md`.
+Wiring this repo up locally and operationalizing the deployed HTTP MCP server,
+**and** building the TTLock middleware + lock-app (above). Outstanding: PR #8 merge
+decision, deployment config in Vercel, adding the remaining property keys, secret
+rotation. See `todo.md`.
 
 ## Conventions
 - **Tool/client parity**: `cloudbeds-mcp/src/{client,tools}.ts` and
