@@ -22,8 +22,10 @@ export const dynamic = "force-dynamic";
  */
 function diagnostics() {
   const clientId = (process.env.TTLOCK_CLIENT_ID ?? "").trim();
+  const clientSecret = (process.env.TTLOCK_CLIENT_SECRET ?? "").trim();
   const username = (process.env.TTLOCK_USERNAME ?? "").trim();
   const password = (process.env.TTLOCK_PASSWORD ?? "").trim();
+  const hex32 = /^[0-9a-f]{32}$/;
   return {
     username, // the account's own login — safe to echo so format/typos are visible
     usernameLength: username.length,
@@ -31,9 +33,14 @@ function diagnostics() {
     passwordLength: password.length,
     // If the stored password is already a 32-char lowercase hex string, it was
     // probably pre-MD5-hashed; our code hashes again → guaranteed 10007.
-    passwordLooksPreHashed: /^[0-9a-f]{32}$/.test(password),
+    passwordLooksPreHashed: hex32.test(password),
     clientIdPreview:
       clientId.length > 10 ? `${clientId.slice(0, 6)}…${clientId.slice(-4)}` : "set",
+    clientIdLooks32Hex: hex32.test(clientId),
+    // A real TTLock client_secret is a 32-char lowercase hex string, like the id.
+    // If this is false, the secret is wrong/truncated/has stray chars.
+    clientSecretLength: clientSecret.length,
+    clientSecretLooks32Hex: hex32.test(clientSecret),
     apiHost: process.env.TTLOCK_BASE_URL ?? "https://euapi.ttlock.com",
   };
 }
