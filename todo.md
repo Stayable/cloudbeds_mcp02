@@ -14,7 +14,13 @@ can't disambiguate without a lock. The ONLY way to confirm `4ec9049d…` = `main
 **Gerardo registers 1 test lock to the account, then re-hit `/api/ttlock-test` →
 lockCount should become 1** (also proves E2E). Auth being solved UNBLOCKS Phase 3
 (Neon) + Phase 4 (webhook) — neither depends on lockCount.
-Still needed: provision Neon (`DATABASE_URL`), generate `WEBHOOK_SECRET`.
+NEXT SESSION (user chose "provision Neon + build webhook"): (1) user provisions Neon
+in Vercel → migrate; (2) build Phase 4 webhook with the CORRECTED design (see Phase 4
+⚠️ note: URL-token auth not HMAC, fetch room via getReservation, per-property keys).
+Still needed: provision Neon (`DATABASE_URL`), generate `WEBHOOK_SECRET` (URL token).
+SECRET HYGIENE: `WebStayable123$` (euopen pw) + client_secret surfaced in chat; the
+working lock2 pw stayed in gitignored `ttlock-test.ps1` only. Delete that file + rotate
+when convenient.
 Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site · P0 = critical path
 
 ### Phase 0 — Prereqs
@@ -38,14 +44,29 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 
 ### Phase 3 — Database (Prisma on Neon)
 - [x] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog` (`middleware/prisma/schema.prisma`)
-      + `lib/db.ts` singleton; prisma generate + build pass. UNCOMMITTED (held so it
-      doesn't churn the in-flight Vercel deploy of 791ea00).
-- [ ] 🟡 P0 Provision Neon → set `DATABASE_URL` → `prisma migrate` / `db push`
+      + `lib/db.ts` singleton; prisma generate + build pass. Committed (645bdb2).
+- [ ] 🟡 P0 Provision Neon (Vercel → middleware project → Storage → Neon) → auto-sets
+      `DATABASE_URL` → then `prisma migrate` / `db push`. ← USER ACTION, next up.
 
 ### Phase 4 — middleware: webhook (core)
-- [ ] 🟢 P0 `lib/webhook-auth.ts` — HMAC verify
-- [ ] 🟢 P0 `POST /api/cloudbeds-webhook` — map lookup, create/delete PIN, store `keyboardPwdId`, log
-- [ ] 🟡 P0 Validate against a **real Cloudbeds webhook payload** (guide field names are assumed)
+⚠️ DESIGN CORRECTED 2026-06-13 (verified vs Cloudbeds docs — build guide was wrong):
+  - **Cloudbeds does NOT HMAC-sign webhooks.** No signature mechanism exists. Use a
+    **secret URL token** instead: register endpoint as `/api/cloudbeds-webhook?token=<WEBHOOK_SECRET>`
+    and verify the token (constant-time compare). `lib/webhook-auth.ts` = token check, not HMAC.
+  - **Webhook payload is THIN** — `reservation/created` carries `version, timestamp, event,
+    propertyID, propertyID_str, reservationID, startDate, endDate`; `status_changed` adds
+    `status`; `deleted` is just propertyID+reservationID. **NO roomID.**
+  - → Handler MUST call Cloudbeds **`getReservation(propertyID, reservationID)`** to get the
+    assigned room(s) → roomID. A reservation can span multiple rooms → multiple PINs.
+  - → Therefore middleware needs the **per-property Cloudbeds keys** (the 8-account registry,
+    like the MCP), NOT a single `CLOUDBEDS_ACCESS_TOKEN`. Mirror `CloudbedsRegistry`.
+  - Cloudbeds retries failed webhooks 5× at 1-min intervals; endpoint must return 2XX fast.
+  - Source: https://developers.cloudbeds.com/docs/webhooks-1
+- [ ] 🟢 P0 `lib/webhook-auth.ts` — secret URL-token verify (NOT HMAC)
+- [ ] 🟢 P0 Port `CloudbedsRegistry` + `getReservation` into middleware (per-property keys)
+- [ ] 🟢 P0 `POST /api/cloudbeds-webhook` — verify token → parse event → getReservation for
+      room(s) → map (propertyID,roomID)→lockId → create/delete PIN → store `keyboardPwdId` → log
+- [ ] 🟡 P0 Validate against a **real Cloudbeds webhook sample** once an endpoint is registered
 
 ### Phase 5 — lock-app: management UI (parallel once DB exists)
 - [ ] 🟢 Scaffold `lock-app/` (reuse `client-portal` magic-link auth)

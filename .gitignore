@@ -1,0 +1,5 @@
+# Local TTLock credential probe — contains pasted secrets, never commit.
+ttlock-test.ps1
+
+# Local screenshots / scratch
+Screenshot*.png
