@@ -95,6 +95,10 @@ Critical facts (mirror the per-property-key discipline above):
 - Webhook is **HMAC-verified** (`WEBHOOK_SECRET`). A `passcode` table stores the TTLock
   `keyboardPwdId` so checkout/cancel can actually delete the PIN.
 - TTLock auth: OAuth password grant, **MD5-hashed** password, token cached (~90-day expiry).
+  **VALIDATED LIVE 2026-06-13** (uid 50221478). Critical: the grant authenticates the
+  **lock-owning `lock2.ttlock.com` account password**, NOT the `euopen.ttlock.com`
+  developer-portal password — same email (`admin@rentstayable.com`), different account &
+  password. Using the portal pw returns `errcode 10007 invalid account or password`.
 - TTLock API gateway: `euapi.ttlock.com` (EU) — NOT `euopen.ttlock.com`, which is
   the docs/portal where the app/client_id is registered and 404s on `/oauth2/token`
   (build-guide error, fixed). TTLock plan upgrade required at 912+ locks

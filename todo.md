@@ -2,23 +2,28 @@
 
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
-Status: **spec APPROVED. Phase 2 scaffolded + builds clean.**
-RESUME HERE (2026-06-12): Phase 2 done — `middleware/` scaffolded (Next 14 + TS),
-`lib/ttlock.ts` (MD5 password, cached token, listLocks, create/deletePasscode),
-`GET /api/ttlock-test`. `npm run typecheck` + `npm run build` both pass locally.
-NEXT (needs networked machine — sandbox blocks `euopen.ttlock.com`): run
-`npm run dev` in `middleware/`, `curl /api/ttlock-test`. Success = `lockCount > 0`
-(`isMainApp: true`) — that confirms `client_id` is the `main` app. `auth:success`
-+ `lockCount:0` = wrong/old app OR no locks registered yet. Then Phase 3 (Prisma/Neon).
-Still needed: `WEBHOOK_SECRET`, provision Neon. CLAUDE.md + todo.md UNCOMMITTED.
+Status: **spec APPROVED. Phase 2 + 3 built. TTLock auth VALIDATED LIVE on Vercel.**
+RESUME HERE (2026-06-13): `/api/ttlock-test` returns `auth:success` (uid 50221478,
+90-day token) on the deployed middleware. The whole 10007 saga root cause:
+**the OAuth password grant uses the lock-owning `lock2.ttlock.com` account password,
+NOT the `euopen.ttlock.com` developer-portal password** (different account/password,
+same email). API host is `euapi.ttlock.com` (euopen 404s). Both now correct in Vercel.
+`lockCount:0` is EXPECTED — no locks registered to this account yet (installed ones
+still on devicethread; rest unpurchased). It does NOT prove the client_id is old;
+can't disambiguate without a lock. The ONLY way to confirm `4ec9049d…` = `main`:
+**Gerardo registers 1 test lock to the account, then re-hit `/api/ttlock-test` →
+lockCount should become 1** (also proves E2E). Auth being solved UNBLOCKS Phase 3
+(Neon) + Phase 4 (webhook) — neither depends on lockCount.
+Still needed: provision Neon (`DATABASE_URL`), generate `WEBHOOK_SECRET`.
 Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site · P0 = critical path
 
 ### Phase 0 — Prereqs
-- [ ] 🟡 P0 Verify `client_id 4ec9049d…` is the **`main`** app, not an "old" one
-      → now testable: run `/api/ttlock-test`, check `lockCount > 0` / `isMainApp`
-- [x] 🟢 TTLock creds in `middleware/.env.local`
-- [ ] 🟡 P0 Generate long random `WEBHOOK_SECRET` → `.env.local`
-- [ ] 🟡 Confirm `admin@rentstayable.com` owns the locks
+- [~] 🔴 P0 Verify `client_id 4ec9049d…` is the **`main`** app — auth confirmed, but
+      `lockCount:0` (no locks yet) so main-vs-old is UNVERIFIABLE until a lock is
+      registered. Blocked on Gerardo registering 1 test lock → re-check lockCount.
+- [x] 🟢 TTLock creds (use **lock2.ttlock.com** account password, NOT euopen portal pw)
+- [ ] 🟡 P0 Generate long random `WEBHOOK_SECRET` → `.env.local` + Vercel
+- [x] 🟢 Confirm `admin@rentstayable.com` owns the locks + the app (it does; auth OK)
 
 ### Phase 1 — Infrastructure (remote)
 - [ ] 🟡 P0 Provision **Neon Postgres** via Vercel Marketplace
@@ -29,7 +34,7 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 - [x] 🟢 P0 Scaffold `middleware/` (Next 14 + TS) — typecheck + build pass
 - [x] 🟢 P0 `lib/ttlock.ts` — token (MD5 password) + cache, listLocks, create/deletePasscode
 - [x] 🟢 P0 `GET /api/ttlock-test` → returns auth status, uid, lockCount, isMainApp
-- [ ] 🟡 Deploy/run → hit `/api/ttlock-test` (needs networked machine — sandbox blocks TTLock)
+- [x] 🟢 Deploy/run → hit `/api/ttlock-test` → `auth:success` on Vercel (2026-06-13)
 
 ### Phase 3 — Database (Prisma on Neon)
 - [x] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog` (`middleware/prisma/schema.prisma`)
