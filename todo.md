@@ -62,11 +62,17 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
     like the MCP), NOT a single `CLOUDBEDS_ACCESS_TOKEN`. Mirror `CloudbedsRegistry`.
   - Cloudbeds retries failed webhooks 5× at 1-min intervals; endpoint must return 2XX fast.
   - Source: https://developers.cloudbeds.com/docs/webhooks-1
-- [ ] 🟢 P0 `lib/webhook-auth.ts` — secret URL-token verify (NOT HMAC)
-- [ ] 🟢 P0 Port `CloudbedsRegistry` + `getReservation` into middleware (per-property keys)
-- [ ] 🟢 P0 `POST /api/cloudbeds-webhook` — verify token → parse event → getReservation for
-      room(s) → map (propertyID,roomID)→lockId → create/delete PIN → store `keyboardPwdId` → log
-- [ ] 🟡 P0 Validate against a **real Cloudbeds webhook sample** once an endpoint is registered
+- [x] 🟢 P0 `lib/webhook-auth.ts` — secret URL-token verify (NOT HMAC), constant-time compare
+- [x] 🟢 P0 Port `CloudbedsRegistry` + `getReservation`/`extractRoomIds` into `middleware/lib/cloudbeds.ts` (per-property keys)
+- [x] 🟢 P0 `POST /api/cloudbeds-webhook` — verify token → parse event → classify intent →
+      getReservation for room(s) → map (propertyID,roomID)→lockId → create/delete PIN →
+      store `keyboardPwdId` → log. Idempotent (safe under Cloudbeds 5× retry). Orchestration
+      in `lib/passcode-sync.ts`. **typecheck + build pass (2026-06-15).**
+- [ ] 🟡 P0 Validate against a **real Cloudbeds webhook sample** once an endpoint is registered.
+      OPEN ASSUMPTION to verify live: roomID is read from `getReservation` → `data.rooms[].roomID`
+      (extraction isolated in `extractRoomIds`); adjust if the live shape differs.
+- [ ] 🟡 Refine PIN validity window to property-timezone check-in/out times (v1 uses UTC
+      day-bounds, generous on both ends — see `validityWindow` in `passcode-sync.ts`).
 
 ### Phase 5 — lock-app: management UI (parallel once DB exists)
 - [ ] 🟢 Scaffold `lock-app/` (reuse `client-portal` magic-link auth)

@@ -12,7 +12,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Runtime queries go through the pooled connection (PgBouncer) — best for
+  // Vercel serverless. Migrations / `db push` need a DIRECT connection, which
+  // Prisma reads from directUrl. The Vercel Neon integration injects both:
+  // DATABASE_URL (pooled, has `-pooler`) and DATABASE_URL_UNPOOLED (direct).
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model LockMap {
