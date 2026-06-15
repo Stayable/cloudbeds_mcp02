@@ -146,8 +146,12 @@ Actions: refresh status, mark lock registered (field task), open mapping.
 Property config (name, real Cloudbeds ID, timezone), lock registration, TTLock
 token status (expiry + manual refresh), webhook status (last event received).
 
-### 4.9 Users
-Add/remove users, assign role + property access (see §7).
+### 4.9 Users & Roles
+Add/remove users; assign each a role + scope (property / group / all). A **Roles**
+sub-section (visible with `roles.manage`) lists roles and their permissions, and lets
+admins **create or edit custom roles** by toggling permissions from the §7 catalog —
+so new roles are added in the UI, never in code. Seeded roles are flagged `isSystem`
+(editable, not deletable).
 
 ---
 
@@ -191,8 +195,9 @@ lock is online** so it is already stored on the device when connectivity fails.
 - **Provisioning:** created/rotated via TTLock while the lock is online. If the lock
   is offline, the action queues and the UI warns it will apply when the gateway
   returns.
-- **Access:** any on-site staff for that property can **reveal** the backup code
-  (logged); only **manager/super_admin** can **rotate** it.
+- **Access:** gated by permissions (§7) — `backup_code.reveal` to view (logged),
+  `backup_code.rotate` to rotate. The seeded `attendant` role can reveal; rotate is
+  reserved to `manager`/`super_admin` by default, but this is configurable per role.
 - **UI:** gold-dashed panel in the door detail, clearly separated from the navy
   guest-code panel, labeled "works offline".
 
@@ -203,15 +208,47 @@ lock is online** so it is already stored on the device when connectivity fails.
 
 ---
 
-## 7. Roles & Permissions
+## 7. Roles & Permissions (extensible / data-driven)
 
-| Role | Scope | Guest codes | Backup code reveal | Backup code rotate | Mapping / Users / Settings |
-|---|---|---|---|---|---|
-| `super_admin` | All 8 properties | ✅ | ✅ | ✅ | ✅ |
-| `manager` (property_admin) | Assigned properties | ✅ | ✅ | ✅ | ✅ (their properties) |
-| `attendant` (field) | Assigned property | View + reveal | ✅ | ❌ | ❌ |
+Roles are **not a hardcoded enum**. They are **records in the database**, each a
+named bundle of granular **permissions** plus a **scope**. Admins create and edit
+roles in the Users/Settings UI — a new role can be added at runtime without a code
+change or a spec revision. The system ships with seeded default roles (below) that
+admins can clone, edit, or disable.
 
-All reveals and rotations are written to the Activity Log with actor + timestamp.
+### Permission catalog (the granular capabilities a role can grant)
+- **Rooms/occupancy:** `rooms.view`
+- **Guest codes:** `guest_code.reveal`, `guest_code.revoke`, `guest_code.generate_manual`
+- **Backup codes:** `backup_code.reveal`, `backup_code.rotate`
+- **Reconciliation:** `lock.sync`
+- **Devices:** `devices.view`, `lock.mark_registered`
+- **Mapping:** `mapping.edit`
+- **Activity log:** `activity.view`, `activity.export`
+- **Admin:** `users.manage`, `roles.manage`, `settings.manage`
+
+The UI gates each action on the relevant permission; every code reveal / rotate and
+every admin change is written to the Activity Log with actor + timestamp regardless
+of role.
+
+### Scope
+Each user assignment carries a scope independent of the role's permissions:
+- `all` — all 8 properties
+- `group` — a named set of properties (e.g. the Jacksonville or Kissimmee cluster)
+- `property` — one or more explicitly-assigned properties
+
+A user's effective access = (role's permissions) ∩ (their assigned scope).
+
+### Seeded default roles
+| Role (seed) | Permissions | Typical scope |
+|---|---|---|
+| `super_admin` | all permissions incl. `roles.manage` | `all` |
+| `manager` | everything except `roles.manage`/`users.manage` (configurable) | `property` / `group` |
+| `attendant` | `rooms.view`, `guest_code.reveal`, `backup_code.reveal`, `lock.sync`, `devices.view`, `activity.view` | `property` |
+
+These are starting points, not fixed — e.g. a future "Maintenance", "Front desk",
+"Regional manager", or read-only "Auditor" role is just a new record with the
+appropriate permission subset and scope, created in the UI. Only `roles.manage`
+holders can define roles.
 
 ---
 
@@ -233,7 +270,14 @@ Extends the existing middleware schema (`LockMap`, `Passcode`, `EventLog`).
 - **`TtlockToken`** (new) — durable token store (`accessToken`, `refreshToken`,
   `expiresAt`, `uid`) so the 90-day token survives serverless cold starts and the
   refresh cron can manage it. (Middleware currently caches in-process only.)
-- **`User`** — email, role, property access list (for the lock-app's own auth).
+- **`User`** — email, `roleId`, scope assignment (scope type + property/group
+  list), for the lock-app's own auth.
+- **`Role`** (new) — `name`, `permissions` (string[] from the §7 catalog; JSON
+  column or a `RolePermission` join), `isSystem` (protects seeded roles from
+  deletion), `createdAt`. Admins with `roles.manage` create/edit roles at runtime —
+  adding a role never requires a code change.
+- **`PropertyGroup`** (optional, new) — named property clusters for `group` scope
+  (e.g. "Jacksonville", "Kissimmee").
 
 > Schema is shared with the middleware. Any change here that the middleware reads
 > (esp. `Passcode.type`) must be coordinated — the middleware's revoke must filter
