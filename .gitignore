@@ -3,3 +3,6 @@ ttlock-test.ps1
 
 # Local screenshots / scratch
 Screenshot*.png
+
+# Brainstorming visual-companion scratch (mockups, server state)
+.superpowers/
