@@ -28,11 +28,12 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
       `lockCount:0` (no locks yet) so main-vs-old is UNVERIFIABLE until a lock is
       registered. Blocked on Gerardo registering 1 test lock → re-check lockCount.
 - [x] 🟢 TTLock creds (use **lock2.ttlock.com** account password, NOT euopen portal pw)
-- [ ] 🟡 P0 Generate long random `WEBHOOK_SECRET` → `.env.local` + Vercel
+- [~] 🟡 P0 Generate long random `WEBHOOK_SECRET` — DONE locally (256-bit base64url in
+      `middleware/.env`, 2026-06-16). STILL NEEDED: add it to Vercel middleware project env.
 - [x] 🟢 Confirm `admin@rentstayable.com` owns the locks + the app (it does; auth OK)
 
 ### Phase 1 — Infrastructure (remote)
-- [ ] 🟡 P0 Provision **Neon Postgres** via Vercel Marketplace
+- [x] 🟢 P0 Provision **Neon Postgres** via Vercel Marketplace (`stayable-locks`, 2026-06-16)
 - [ ] 🟡 Create 2 Vercel projects → Root Dirs `middleware/`, `lock-app/`
 - [ ] 🟡 Connect the one Neon DB to both projects (shared `DATABASE_URL`)
 
@@ -45,8 +46,9 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 ### Phase 3 — Database (Prisma on Neon)
 - [x] 🟢 P0 Schema: `LockMap`, `Passcode`, `EventLog` (`middleware/prisma/schema.prisma`)
       + `lib/db.ts` singleton; prisma generate + build pass. Committed (645bdb2).
-- [ ] 🟡 P0 Provision Neon (Vercel → middleware project → Storage → Neon) → auto-sets
-      `DATABASE_URL` → then `prisma migrate` / `db push`. ← USER ACTION, next up.
+- [x] 🟢 P0 Provision Neon (`stayable-locks`, Vercel→Storage). Strings pasted into
+      `middleware/.env` by hand (Sensitive vars pull empty). `prisma db push` synced;
+      3 tables verified live (LockMap/Passcode/EventLog, all empty). 2026-06-16.
 
 ### Phase 4 — middleware: webhook (core)
 ⚠️ DESIGN CORRECTED 2026-06-13 (verified vs Cloudbeds docs — build guide was wrong):
@@ -75,7 +77,19 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
       day-bounds, generous on both ends — see `validityWindow` in `passcode-sync.ts`).
 
 ### Phase 5 — lock-app: management UI (parallel once DB exists)
-- [ ] 🟢 Scaffold `lock-app/` (reuse `client-portal` magic-link auth)
+- [x] 🟢 Read-surfaces plan (`2026-06-17-lock-app-read-surfaces.md`, Plan 2 of 5) — DONE
+      2026-06-17. App shell (hybrid nav + property switcher, permission-gated), Overview
+      portfolio cards, Rooms grid (occupancy/health/masked code + search/filter), Devices
+      inventory, Activity Log (search/filter + CSV export, amber/red tint). 4 pure view-model
+      libs (properties/rooms/overview/activity) TDD — 32 tests pass. Dev seed (2 properties,
+      super_admin user). typecheck/build green. NEXT: Plan 3 (code actions) or create the
+      lock-app Vercel project to deploy.
+- [x] 🟢 Foundation plan (`2026-06-16-lock-app-foundation.md`) — DONE 2026-06-16. Scaffolded
+      Next 14 + TS + Tailwind; superset Prisma schema pushed to shared Neon (User/Role/
+      Session/MagicLink/PropertyGroup/RoomState/TtlockToken + lock-health/Passcode.type
+      mirrored to middleware); permission catalog + hasPermission (TDD, 5/5); magic-link
+      auth (role-aware session) + RBAC helpers; 3 roles seeded; login page + auth routes
+      (email stubbed → Plan 5). typecheck/build/tests pass. 9 commits.
 - [ ] 🟢 Admin: LockMap CRUD, view/revoke/issue PINs, event log
 - [ ] 🟢 Field (mobile): room lookup → current PIN, mark lock registered
 
