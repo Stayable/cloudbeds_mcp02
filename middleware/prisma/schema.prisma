@@ -26,15 +26,21 @@ model LockMap {
   roomId     String // Cloudbeds room id (unique only within a property)
   lockId     BigInt // TTLock lock id (globally unique in the account)
   alias      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  // lock health (mirrored from lock-app superset; polled by lock-app Plan 4 cron)
+  online     Boolean   @default(true)
+  battery    Int? // 0-100
+  lastSeen   DateTime?
+  model      String?
+  gatewayId  BigInt?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([propertyId, roomId])
 }
 
 model Passcode {
   id            String   @id @default(cuid())
-  reservationId String
+  reservationId String? // nullable: backup/manual codes have no reservation
   propertyId    String
   roomId        String
   lockId        BigInt
@@ -43,6 +49,7 @@ model Passcode {
   startTs       BigInt // unix ms
   endTs         BigInt
   status        String // active | revoked | failed
+  type          String   @default("guest") // guest | backup | manual
   createdAt     DateTime @default(now())
 
   @@index([reservationId])

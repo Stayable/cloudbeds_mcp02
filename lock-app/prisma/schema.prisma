@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ---------- SHARED with middleware (keep definitions in sync) ----------
+
+model LockMap {
+  id         String   @id @default(cuid())
+  propertyId String
+  roomId     String
+  lockId     BigInt
+  alias      String?
+  // lock health (lock-app additions; polled by Plan 4 cron)
+  online     Boolean   @default(true)
+  battery    Int? // 0-100
+  lastSeen   DateTime?
+  model      String?
+  gatewayId  BigInt?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([propertyId, roomId])
+}
+
+model Passcode {
+  id            String   @id @default(cuid())
+  reservationId String? // nullable: backup/manual codes have no reservation
+  propertyId    String
+  roomId        String
+  lockId        BigInt
+  keyboardPwdId BigInt
+  pin           String
+  startTs       BigInt
+  endTs         BigInt
+  status        String // active | revoked | failed
+  type          String   @default("guest") // guest | backup | manual
+  createdAt     DateTime @default(now())
+
+  @@index([reservationId])
+}
+
+model EventLog {
+  id          String   @id @default(cuid())
+  source      String // webhook | admin | field | cron | ttlock-push
+  event       String
+  propertyId  String?
+  roomId      String?
+  lockId      BigInt?
+  action      String
+  // actor (lock-app additions; null for system events)
+  actorUserId String?
+  actorEmail  String?
+  actorRole   String?
+  detail      Json?
+  createdAt   DateTime @default(now())
+}
+
+// ---------- LOCK-APP OWN TABLES ----------
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  roleId      String
+  role        Role     @relation(fields: [roleId], references: [id])
+  scopeType   String   @default("property") // all | group | property
+  propertyIds String[] @default([]) // when scopeType = property
+  groupId     String? // when scopeType = group
+  createdAt   DateTime @default(now())
+
+  sessions   Session[]
+  magicLinks MagicLink[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String[] @default([])
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  users       User[]
+}
+
+model PropertyGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  propertyIds String[] @default([])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model RoomState {
+  id                   String   @id @default(cuid())
+  propertyId           String
+  roomId               String
+  occupancyStatus      String   @default("free") // free | reserved | occupied
+  currentReservationId String?
+  guestName            String?
+  checkoutDate         String?
+  updatedAt            DateTime @updatedAt
+
+  @@unique([propertyId, roomId])
+}
+
+model TtlockToken {
+  id           String   @id @default(cuid())
+  accessToken  String
+  refreshToken String
+  uid          BigInt
+  expiresAt    BigInt // unix ms
+  updatedAt    DateTime @updatedAt
+}
