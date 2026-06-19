@@ -46,8 +46,11 @@ export async function revokeGuestCode(propertyId: string, roomId: string): Promi
 
 /** Generate a manual (no-reservation) period code valid for `hours` from now. */
 export async function generateManualCode(formData: FormData): Promise<void> {
-  const propertyId = String(formData.get("propertyId"));
-  const roomId = String(formData.get("roomId"));
+  const propertyIdRaw = formData.get("propertyId");
+  const roomIdRaw = formData.get("roomId");
+  if (!propertyIdRaw || !roomIdRaw) throw new Error("Missing propertyId or roomId");
+  const propertyId = String(propertyIdRaw);
+  const roomId = String(roomIdRaw);
   const hours = Number(formData.get("hours") ?? 24);
   const user = await requirePermission("guest_code.generate_manual", propertyId);
 
