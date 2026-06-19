@@ -13,4 +13,7 @@ describe("buildDetail", () => {
     const d = buildDetail({ beforePin: "111111", afterPin: "909090" });
     expect(d.change).toBe("••••11 → ••••90");
   });
+  it("does not let extra clobber outcome", () => {
+    expect(buildDetail({ extra: { outcome: "failed" } }).outcome).toBe("success");
+  });
 });

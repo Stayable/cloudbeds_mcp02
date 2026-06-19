@@ -18,7 +18,7 @@ export interface BuildDetailInput {
 }
 
 export function buildDetail(input: BuildDetailInput): Record<string, unknown> {
-  const detail: Record<string, unknown> = { outcome: input.outcome ?? "success", ...input.extra };
+  const detail: Record<string, unknown> = { ...input.extra, outcome: input.outcome ?? "success" };
   if (input.reservationId) detail.reservationId = input.reservationId;
   if (input.message) detail.message = input.message;
   if (input.beforePin && input.afterPin) {
