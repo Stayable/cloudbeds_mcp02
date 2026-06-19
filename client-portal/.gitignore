@@ -19,3 +19,5 @@ uploads/
 # misc
 .DS_Store
 *.tsbuildinfo
+.vercel
+.env*

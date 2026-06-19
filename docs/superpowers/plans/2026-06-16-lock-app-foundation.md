@@ -842,7 +842,10 @@ main()
 Run:
 ```bash
 cd lock-app
-# vercel env pull .env.local   # if not already present
+# Pull into .env (NOT .env.local): the Prisma CLI only auto-loads .env, so
+# `prisma db push` can't see DATABASE_URL/_UNPOOLED from .env.local. (.env is
+# gitignored; Next reads it too.) Pull PRODUCTION where Neon vars live.
+vercel env pull .env --environment=production
 npx prisma db push
 npm run db:seed
 ```
