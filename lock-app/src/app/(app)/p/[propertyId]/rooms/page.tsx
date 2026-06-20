@@ -57,7 +57,7 @@ export default async function RoomsPage({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
         {tiles.map((t) => (
-          <div key={t.roomId} style={{ border: "1px solid #d7dde6", borderRadius: 10, overflow: "hidden" }}>
+          <a key={t.roomId} href={`/p/${propertyId}/rooms/${t.roomId}`} style={{ border: "1px solid #d7dde6", borderRadius: 10, overflow: "hidden", textDecoration: "none", color: "inherit" }}>
             <div style={{ height: 6, background: COLOR[t.occupancyColor] }} />
             <div style={{ padding: 12, color: "#041E42" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -70,7 +70,7 @@ export default async function RoomsPage({
               <div style={{ fontSize: 13, marginTop: 6 }}>code {t.maskedCode ?? "—"}</div>
               {t.guestName && <div style={{ fontSize: 12, marginTop: 6, color: "#456" }}>{t.guestName} · out {t.checkoutDate}</div>}
             </div>
-          </div>
+          </a>
         ))}
       </div>
       {tiles.length === 0 && <p style={{ marginTop: 16 }}>No rooms match.</p>}
