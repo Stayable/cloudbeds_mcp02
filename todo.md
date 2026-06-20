@@ -90,7 +90,11 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
       mirrored to middleware); permission catalog + hasPermission (TDD, 5/5); magic-link
       auth (role-aware session) + RBAC helpers; 3 roles seeded; login page + auth routes
       (email stubbed → Plan 5). typecheck/build/tests pass. 9 commits.
-- [ ] 🟢 Admin: LockMap CRUD, view/revoke/issue PINs, event log
+- [x] 🟢 Admin code actions (Plan 3, 2026-06-20) — Door/Room detail page; guest
+      reveal/revoke/manual, staff backup reveal/rotate (permanent code), sync-from-lock
+      reconcile, LockMap CRUD; all permission-gated + audit-logged. Pure libs TDD
+      (passcodes/reconcile/audit/door-detail). TTLock client ported. typecheck/build/tests
+      green. LIVE-UNVERIFIED: needs a registered lock + reachable euapi.ttlock.com.
 - [ ] 🟢 Field (mobile): room lookup → current PIN, mark lock registered
 
 ### Phase 6 — Cloudbeds webhook registration

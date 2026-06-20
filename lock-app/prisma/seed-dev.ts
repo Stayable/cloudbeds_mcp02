@@ -78,6 +78,30 @@ async function main() {
       ],
     });
   }
+
+  // Plan 3 demo: give Lakeland room 101 (lock 388) a staff backup code and a
+  // revoked historical guest code, alongside the live guest code seeded above —
+  // so the Door/Room detail page shows guest + backup + history together.
+  const demoProperty = "210972"; // Lakeland — matches a LockMap row seeded above
+  const demoRoom = "101";        // matches a seeded LockMap.roomId
+  const demoLock = 388n;         // matches that LockMap.lockId
+  await prisma.passcode.createMany({
+    data: [
+      {
+        reservationId: null, propertyId: demoProperty, roomId: demoRoom, lockId: demoLock,
+        keyboardPwdId: 9002n, pin: "330077",
+        startTs: 0n, endTs: 0n, status: "active", type: "backup",
+      },
+      {
+        reservationId: "DEMO-RES-0", propertyId: demoProperty, roomId: demoRoom, lockId: demoLock,
+        keyboardPwdId: 9000n, pin: "111190",
+        startTs: BigInt(Date.parse("2026-06-10T00:00:00Z")), endTs: BigInt(Date.parse("2026-06-12T23:59:59Z")),
+        status: "revoked", type: "guest",
+      },
+    ],
+    skipDuplicates: true,
+  });
+
   console.log(`Dev seed complete: ${PROPS.length} properties, user ${ADMIN_EMAIL}.`);
 }
 
