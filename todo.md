@@ -2,22 +2,24 @@
 
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
-Status: **spec APPROVED. Phase 2 + 3 built. TTLock auth VALIDATED LIVE on Vercel.**
-RESUME HERE (2026-06-13): `/api/ttlock-test` returns `auth:success` (uid 50221478,
-90-day token) on the deployed middleware. The whole 10007 saga root cause:
-**the OAuth password grant uses the lock-owning `lock2.ttlock.com` account password,
-NOT the `euopen.ttlock.com` developer-portal password** (different account/password,
-same email). API host is `euapi.ttlock.com` (euopen 404s). Both now correct in Vercel.
-`lockCount:0` is EXPECTED — no locks registered to this account yet (installed ones
-still on devicethread; rest unpurchased). It does NOT prove the client_id is old;
-can't disambiguate without a lock. The ONLY way to confirm `4ec9049d…` = `main`:
-**Gerardo registers 1 test lock to the account, then re-hit `/api/ttlock-test` →
-lockCount should become 1** (also proves E2E). Auth being solved UNBLOCKS Phase 3
-(Neon) + Phase 4 (webhook) — neither depends on lockCount.
-NEXT SESSION (user chose "provision Neon + build webhook"): (1) user provisions Neon
-in Vercel → migrate; (2) build Phase 4 webhook with the CORRECTED design (see Phase 4
-⚠️ note: URL-token auth not HMAC, fetch room via getReservation, per-property keys).
-Still needed: provision Neon (`DATABASE_URL`), generate `WEBHOOK_SECRET` (URL token).
+Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
+VALIDATED LIVE. lock-app Plans 2+3 DONE (read surfaces + admin code actions).**
+RESUME HERE (2026-06-20): **lock-app Plan 3 (admin code actions) COMPLETE.** All 10
+tasks done — Door/Room detail page (`/p/[propertyId]/rooms/[roomId]`) + RevealButton;
+guest reveal/revoke/manual, staff backup reveal/rotate, sync-from-lock reconcile,
+LockMap CRUD; all permission-gated + audit-logged; pure libs TDD'd. typecheck/build
+green, 50/50 tests pass. Demo passcodes seeded to Neon (Lakeland rm 101: live guest +
+backup + revoked history). 5 commits this session (fab9c7d→7b1fd9c).
+NEXT SESSION — pick one: (1) **Plan 4** = alerts engine + crons (next in lock-app
+sequence per design doc; battery-trend history deferred here lands there); (2) **create
+the lock-app Vercel project** (Root Dir `lock-app/`, shared Neon `DATABASE_URL`) to
+deploy what's built; (3) **Plan 5** = Users/Roles/Settings UI + real magic-link email.
+Still LIVE-UNVERIFIED (blocks E2E, not dev): TTLock write paths need a registered lock
++ reachable `euapi.ttlock.com`; webhook needs a real Cloudbeds sample. Branch is 41
+commits ahead of origin — NOT pushed.
+TTLock auth root cause (reference): OAuth grant uses the lock-owning `lock2.ttlock.com`
+account password, NOT the `euopen.ttlock.com` portal pw; API host `euapi.ttlock.com`.
+Confirming `4ec9049d…` = `main` still needs Gerardo to register 1 test lock.
 SECRET HYGIENE: `WebStayable123$` (euopen pw) + client_secret surfaced in chat; the
 working lock2 pw stayed in gitignored `ttlock-test.ps1` only. Delete that file + rotate
 when convenient.
