@@ -29,7 +29,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{ width: "100%", padding: 10, margin: "8px 0 16px", borderRadius: 6, border: "none" }}
+              style={{ width: "100%", padding: 10, margin: "8px 0 16px", borderRadius: 6, border: "none", background: "#fff", color: "#041E42" }}
             />
             <button
               type="submit"
