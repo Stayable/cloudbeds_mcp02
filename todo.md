@@ -3,17 +3,25 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
-VALIDATED LIVE. lock-app Plans 2+3 DONE (read surfaces + admin code actions).**
-RESUME HERE (2026-06-20): **lock-app Plan 3 (admin code actions) COMPLETE.** All 10
-tasks done — Door/Room detail page (`/p/[propertyId]/rooms/[roomId]`) + RevealButton;
-guest reveal/revoke/manual, staff backup reveal/rotate, sync-from-lock reconcile,
-LockMap CRUD; all permission-gated + audit-logged; pure libs TDD'd. typecheck/build
-green, 50/50 tests pass. Demo passcodes seeded to Neon (Lakeland rm 101: live guest +
-backup + revoked history). 5 commits this session (fab9c7d→7b1fd9c).
-NEXT SESSION — pick one: (1) **Plan 4** = alerts engine + crons (next in lock-app
-sequence per design doc; battery-trend history deferred here lands there); (2) **create
-the lock-app Vercel project** (Root Dir `lock-app/`, shared Neon `DATABASE_URL`) to
-deploy what's built; (3) **Plan 5** = Users/Roles/Settings UI + real magic-link email.
+VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
+Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
+RESUME HERE (2026-06-23): **Property-first restructure COMPLETE** (8-task plan,
+`docs/superpowers/plans/2026-06-23-lock-app-property-first-restructure.md`). Shipped:
+email-**OTP** login (6-digit code, replaces magic-link; code logged to console till
+email delivery ships), **Portfolio** picker landing (`/portfolio`) → per-property
+**Dashboard** (`/p/[id]/dashboard`, KPIs + "My Actions" feed, no zones), property-scoped
+**flat sidebar** (Dashboard/Alerts/Rooms/Devices/Activity + ← Portfolio; Settings/Users
+pinned bottom), **top bar** with profile menu (name/notification prefs/sign out; password
+deferred) + in-app **notification bell** (unseen count from EventLog warning/failed;
+delivery deferred to Alerts engine). Login white-on-white input bug fixed. 3 new pure
+libs TDD (otp/dashboard/notifications); **65/65 tests pass**, typecheck+build green.
+Smoke-tested live: OTP login → portfolio → dashboard renders seeded actions. Removed
+unused PropertySwitcher. 9 commits this session.
+NEXT SESSION — pick one: (1) **Plan 4** = alerts engine + crons (turns the bell real:
+detection jobs + email delivery + notification-pref enforcement); (2) **create the
+lock-app Vercel project** (Root Dir `lock-app/`, shared Neon `DATABASE_URL`) to deploy;
+(3) **Plan 5 remainder** = Users/Roles/Settings UI + real OTP email (reuse client-portal
+email.ts) + optional password auth.
 Still LIVE-UNVERIFIED (blocks E2E, not dev): TTLock write paths need a registered lock
 + reachable `euapi.ttlock.com`; webhook needs a real Cloudbeds sample. Branch is 41
 commits ahead of origin — NOT pushed.
