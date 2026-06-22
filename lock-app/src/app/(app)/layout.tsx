@@ -1,14 +1,13 @@
 import { requireUserOrRedirect } from "@/lib/session-access";
-import Sidebar from "@/components/Sidebar";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUserOrRedirect();
+  await requireUserOrRedirect();
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar user={user} />
-      <main style={{ flex: 1, padding: 24, background: "#fff" }}>{children}</main>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#fff" }}>
+      {/* TopBar added in Task 7 */}
+      <div style={{ display: "flex", flex: 1 }}>{children}</div>
     </div>
   );
 }

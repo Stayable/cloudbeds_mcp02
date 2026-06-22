@@ -5,26 +5,23 @@ import { summarizeProperty } from "@/lib/overview";
 
 export const dynamic = "force-dynamic";
 
-export default async function OverviewPage() {
+export default async function PortfolioPage() {
   const user = await requireUserOrRedirect();
   const props = userProperties(user);
-
   const locks = await prisma.lockMap.findMany({
     where: { propertyId: { in: props.map((p) => p.id) } },
     select: { propertyId: true, online: true, battery: true },
   });
-
   const cards = props.map((p) =>
     summarizeProperty(p, locks.filter((l) => l.propertyId === p.id).map((l) => ({ online: l.online, battery: l.battery }))),
   );
-
   return (
     <div>
-      <h1 style={{ color: "#041E42" }}>Overview</h1>
-      <p style={{ color: "#456" }}>Portfolio health across {props.length} properties.</p>
+      <h1 style={{ color: "#041E42" }}>Portfolio</h1>
+      <p style={{ color: "#456" }}>Choose a property to manage — {props.length} in your scope.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
         {cards.map((c) => (
-          <Link key={c.propertyId} href={`/p/${c.propertyId}/rooms`} style={{ textDecoration: "none" }}>
+          <Link key={c.propertyId} href={`/p/${c.propertyId}/dashboard`} style={{ textDecoration: "none" }}>
             <div style={{ border: "1px solid #d7dde6", borderRadius: 10, padding: 16, color: "#041E42" }}>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>{c.name}</div>
               <div style={{ fontSize: 13 }}>{c.totalLocks} locks · {c.online} online</div>
