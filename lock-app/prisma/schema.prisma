@@ -74,6 +74,9 @@ model User {
   groupId     String? // when scopeType = group
   createdAt   DateTime @default(now())
 
+  notificationPrefs   Json?
+  notificationsSeenAt DateTime?
+
   sessions   Session[]
   magicLinks MagicLink[]
 }
@@ -97,6 +100,7 @@ model MagicLink {
   id        String   @id @default(cuid())
   email     String
   token     String   @unique
+  code      String?
   used      Boolean  @default(false)
   expiresAt DateTime
   userId    String?
