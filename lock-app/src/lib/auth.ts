@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
+import { generateOtpCode, otpMatches } from "./otp";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-change-me";
 
@@ -15,30 +16,34 @@ export interface SessionUser {
   propertyIds: string[];
 }
 
-export async function createMagicLink(email: string): Promise<string> {
-  const token = uuidv4();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+export async function createOtp(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return; // don't leak which emails exist
+  const code = generateOtpCode();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   await prisma.magicLink.create({
-    data: { email, token, expiresAt, userId: user?.id ?? null },
+    data: { email, token: uuidv4(), code, expiresAt, userId: user.id },
   });
-  return token;
+  // Plan-5 wires real email. For now, log the code.
+  console.log(`[otp] ${email} -> ${code}`);
 }
 
-export async function verifyMagicLink(
-  token: string,
+export async function verifyOtp(
+  email: string,
+  code: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const link = await prisma.magicLink.findUnique({ where: { token } });
-  if (!link) return { success: false, error: "Invalid link" };
-  if (link.used) return { success: false, error: "Link already used" };
-  if (link.expiresAt < new Date()) return { success: false, error: "Link expired" };
-  if (!link.userId) return { success: false, error: "User not found" };
-
+  const link = await prisma.magicLink.findFirst({
+    where: { email, used: false },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!link || !link.userId) return { success: false, error: "Invalid code" };
+  if (!otpMatches({ code: link.code, used: link.used, expiresAt: link.expiresAt }, code, new Date())) {
+    return { success: false, error: "Invalid or expired code" };
+  }
   await prisma.magicLink.update({ where: { id: link.id }, data: { used: true } });
 
   const sessionToken = jwt.sign({ userId: link.userId }, JWT_SECRET, { expiresIn: "8h" });
-  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8h per spec §10 (old) / internal ops
-
+  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
   await prisma.session.create({
     data: { userId: link.userId, token: sessionToken, expiresAt },
   });

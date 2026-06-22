@@ -1,11 +1,12 @@
-import { verifyMagicLink } from "@/lib/auth";
+import { verifyOtp } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  const token = new URL(req.url).searchParams.get("token") ?? "";
-  const result = await verifyMagicLink(token);
-  const dest = result.success ? "/" : `/login?error=${encodeURIComponent(result.error ?? "failed")}`;
-  return Response.redirect(new URL(dest, process.env.NEXT_PUBLIC_APP_URL), 302);
+export async function POST(req: Request) {
+  const { email, code } = (await req.json().catch(() => ({}))) as { email?: string; code?: string };
+  if (!email || !code) return Response.json({ ok: false, error: "email and code required" }, { status: 400 });
+  const result = await verifyOtp(email, code);
+  if (!result.success) return Response.json({ ok: false, error: result.error }, { status: 401 });
+  return Response.json({ ok: true });
 }
