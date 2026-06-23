@@ -44,8 +44,16 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 
 ### Phase 1 — Infrastructure (remote)
 - [x] 🟢 P0 Provision **Neon Postgres** via Vercel Marketplace (`stayable-locks`, 2026-06-16)
-- [ ] 🟡 Create 2 Vercel projects → Root Dirs `middleware/`, `lock-app/`
-- [ ] 🟡 Connect the one Neon DB to both projects (shared `DATABASE_URL`)
+- [~] 🟡 Create 2 Vercel projects → Root Dirs `middleware/`, `lock-app/`
+      **lock-app DONE 2026-06-23**: project `lock-app` (prj_y94ZneZEErOo6cCEh5PZFoummxC8,
+      team stayable-admins-projects) deployed to prod via CLI from `lock-app/` dir.
+      Prod URL: **https://lock-app-dusky.vercel.app**. middleware project still TODO.
+- [~] 🟡 Connect the one Neon DB to both projects (shared `DATABASE_URL`)
+      lock-app: DATABASE_URL + DATABASE_URL_UNPOOLED + JWT_SECRET set (Production). DB
+      connectivity verified live (auth/request → 200). Preview-env vars NOT set yet.
+      OPEN: prod login needs the OTP code from Vercel runtime logs until email is wired
+      (Plan 4/5); CLI deploy is NOT Git-connected (no auto-deploy on push) — wire Git
+      integration + Root Dir `lock-app/` in the dashboard if auto-deploys are wanted.
 
 ### Phase 2 — middleware: TTLock auth (validates creds) ⭐
 - [x] 🟢 P0 Scaffold `middleware/` (Next 14 + TS) — typecheck + build pass
