@@ -26,7 +26,7 @@ export default async function PortfolioPage() {
       </header>
 
       {cards.length > 0 ? (
-        <div className="portfolio-row" role="list">
+        <div className="portfolio-grid" role="list">
           {cards.map((c) => (
             <Link
               key={c.propertyId}

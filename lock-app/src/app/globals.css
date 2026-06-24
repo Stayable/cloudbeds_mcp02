@@ -54,24 +54,30 @@ a  { color: inherit; }
 .subtle { color: var(--muted); font-size: 14px; }
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* Property row — single horizontal rack of status panels ----------------- */
-.portfolio-row {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  padding: 4px 4px 12px;
-  margin: 18px -4px 0;
-  scroll-snap-type: x proximity;
+/* Demo-data strip — honest banner shown app-wide until live locks connect. */
+.demo-strip {
+  background: var(--navy);
+  color: #ffffff;
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: center;
+  padding: 7px 16px;
 }
-.portfolio-row::-webkit-scrollbar { height: 8px; }
-.portfolio-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+.demo-strip strong { color: var(--gold); font-weight: 700; letter-spacing: 0.05em; }
+
+/* Property grid — cards wrap into rows (4 / 3 / 2 / 1 by width) ----------- */
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+@media (max-width: 1024px) { .portfolio-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px)  { .portfolio-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px)  { .portfolio-grid { grid-template-columns: 1fr; } }
 
 .prop-card {
   position: relative;
-  flex: 1 1 210px;
-  min-width: 210px;
-  max-width: 300px;
-  scroll-snap-align: start;
   display: block;
   background: var(--surface);
   border: 1px solid var(--line);
