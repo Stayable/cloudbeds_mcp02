@@ -16,27 +16,42 @@ export default async function PortfolioPage() {
     summarizeProperty(p, locks.filter((l) => l.propertyId === p.id).map((l) => ({ online: l.online, battery: l.battery }))),
   );
   return (
-    <div>
-      <h1 style={{ color: "#041E42" }}>Portfolio</h1>
-      <p style={{ color: "#456" }}>Choose a property to manage — {props.length} in your scope.</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
-        {cards.map((c) => (
-          <Link key={c.propertyId} href={`/p/${c.propertyId}/dashboard`} style={{ textDecoration: "none" }}>
-            <div style={{ border: "1px solid #d7dde6", borderRadius: 10, padding: 16, color: "#041E42" }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>{c.name}</div>
-              <div style={{ fontSize: 13 }}>{c.totalLocks} locks · {c.online} online</div>
-              <div style={{ marginTop: 8, display: "flex", gap: 8, fontSize: 12 }}>
-                <span style={{ color: c.offline ? "#c0392b" : "#2e7d32" }}>{c.offline} offline</span>
-                <span style={{ color: c.lowBattery ? "#b9770e" : "#2e7d32" }}>{c.lowBattery} low battery</span>
+    <div className="page">
+      <header className="page-head">
+        <div className="eyebrow">Operations</div>
+        <h1>Portfolio</h1>
+        <p className="subtle">
+          Choose a property to manage — {props.length} {props.length === 1 ? "property" : "properties"} in your scope.
+        </p>
+      </header>
+
+      {cards.length > 0 ? (
+        <div className="portfolio-row" role="list">
+          {cards.map((c) => (
+            <Link
+              key={c.propertyId}
+              href={`/p/${c.propertyId}/dashboard`}
+              role="listitem"
+              className="prop-card"
+              style={{ "--status": c.needsAttention ? "var(--crit)" : "var(--ok)" } as React.CSSProperties}
+            >
+              <div className="prop-name">{c.name}</div>
+              <div className="prop-count tnum">
+                <strong>{c.totalLocks}</strong> locks · <strong>{c.online}</strong> online
               </div>
-              <div style={{ marginTop: 10, fontWeight: 700, color: c.needsAttention ? "#c0392b" : "#2e7d32" }}>
+              <div className="chips tnum">
+                <span className="chip" data-tone={c.offline ? "crit" : undefined}>{c.offline} offline</span>
+                <span className="chip" data-tone={c.lowBattery ? "warn" : undefined}>{c.lowBattery} low battery</span>
+              </div>
+              <div className="prop-status" data-tone={c.needsAttention ? "crit" : "ok"}>
                 {c.needsAttention ? `${c.needsAttention} need attention` : "All clear"}
               </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-      {props.length === 0 && <p>No properties are in your scope.</p>}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="empty">No properties are in your scope yet.</div>
+      )}
     </div>
   );
 }
