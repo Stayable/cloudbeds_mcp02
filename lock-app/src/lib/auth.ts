@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { generateOtpCode, otpMatches } from "./otp";
+import { sendOtpEmail } from "./email";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-change-me";
 
@@ -24,8 +25,14 @@ export async function createOtp(email: string): Promise<void> {
   await prisma.magicLink.create({
     data: { email, token: uuidv4(), code, expiresAt, userId: user.id },
   });
-  // Plan-5 wires real email. For now, log the code.
-  console.log(`[otp] ${email} -> ${code}`);
+  // Deliver via Resend. If email fails (or isn't configured), log the code so
+  // login never hard-fails — the code is still valid from the DB row above.
+  try {
+    await sendOtpEmail(email, code);
+  } catch (err) {
+    console.error(`[otp] email delivery failed for ${email}:`, err);
+    console.log(`[otp] ${email} -> ${code}`);
+  }
 }
 
 export async function verifyOtp(
