@@ -30,8 +30,12 @@ export default async function TopBar({ user }: { user: SessionUser }) {
   const prefs = { ...DEFAULT_PREFS, ...((dbUser?.notificationPrefs as Partial<Prefs> | null) ?? {}) };
 
   return (
-    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", borderBottom: "1px solid #e3e8ef", background: "#fff" }}>
-      <div style={{ color: "#FDDA24", background: "#041E42", padding: "4px 10px", borderRadius: 6, fontWeight: 800, letterSpacing: 1, fontSize: 13 }}>STAYABLE</div>
+    <header className="topbar">
+      <div className="search" style={{ width: 260 }}>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="7" cy="7" r="4.5" /><path d="M11 11l3 3" strokeLinecap="round" /></svg>
+        <span>Search rooms, locks, codes</span>
+      </div>
+      <div style={{ flex: 1 }} />
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <NotificationBell unseen={unseen} items={recent} />
         <ProfileMenu name={user.name} role={user.roleName} prefs={prefs} />

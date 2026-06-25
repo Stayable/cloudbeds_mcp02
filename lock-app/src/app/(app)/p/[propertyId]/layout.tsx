@@ -1,20 +1,8 @@
-import { requireUserOrRedirect } from "@/lib/session-access";
-import Sidebar from "@/components/Sidebar";
-
 export const dynamic = "force-dynamic";
 
-export default async function PropertyLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { propertyId: string };
-}) {
-  const user = await requireUserOrRedirect();
-  return (
-    <div style={{ display: "flex", flex: 1 }}>
-      <Sidebar user={user} currentProperty={params.propertyId} />
-      <div style={{ flex: 1, padding: 24 }}>{children}</div>
-    </div>
-  );
+/** Property pages render inside the global app shell (sidebar + topbar live in
+ *  the (app) layout). This layout is a passthrough; the sidebar derives the
+ *  active property from the path. */
+export default function PropertyLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
