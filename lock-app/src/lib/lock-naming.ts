@@ -51,6 +51,15 @@ export function parseLockName(name: string): ParsedLockName | null {
   return { propertyId, room };
 }
 
+/**
+ * Best-guess room number from a lock's name, used to pre-fill the assign form in
+ * the Unassigned queue (the operator can override). Returns the first run of
+ * digits in the name (e.g. "Room# 239" → "239", "KE-105" → "105"), or "".
+ */
+export function guessRoomNumber(name: string): string {
+  return name.match(/\d+/)?.[0] ?? "";
+}
+
 export type LockClassification =
   | { kind: "map"; propertyId: string; room: string }
   | { kind: "keep" }

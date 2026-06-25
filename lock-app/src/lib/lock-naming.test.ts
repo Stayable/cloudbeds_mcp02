@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseLockName, classifyLock, canonicalLockName } from "./lock-naming";
+import { parseLockName, classifyLock, canonicalLockName, guessRoomNumber } from "./lock-naming";
 
 describe("parseLockName", () => {
   it("maps a conforming name to property + room", () => {
@@ -76,5 +76,21 @@ describe("canonicalLockName", () => {
 
   it("returns null for an empty room", () => {
     expect(canonicalLockName("210986", "  ")).toBeNull();
+  });
+});
+
+describe("guessRoomNumber", () => {
+  it("pulls a bare room number", () => {
+    expect(guessRoomNumber("239")).toBe("239");
+  });
+  it("pulls the room from common lock-name shapes", () => {
+    expect(guessRoomNumber("Room# 239")).toBe("239");
+    expect(guessRoomNumber("Room 239-1254")).toBe("239");
+    expect(guessRoomNumber("KE-105")).toBe("105");
+    expect(guessRoomNumber("Lock 7")).toBe("7");
+  });
+  it("returns empty when there is no number", () => {
+    expect(guessRoomNumber("lobby-HVAC unit room")).toBe("");
+    expect(guessRoomNumber("")).toBe("");
   });
 });

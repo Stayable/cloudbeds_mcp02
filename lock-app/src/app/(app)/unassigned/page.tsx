@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { PROPERTIES } from "@/lib/properties";
+import { guessRoomNumber } from "@/lib/lock-naming";
 import Forbidden from "@/components/Forbidden";
 import SyncButton from "./SyncButton";
 import { assignUnassignedLock } from "./actions";
@@ -58,7 +59,7 @@ export default async function UnassignedPage() {
                       <option value="" disabled>Property…</option>
                       {PROPERTIES.map((p) => <option key={p.id} value={p.id}>{p.abbr} — {p.name}</option>)}
                     </select>
-                    <input name="room" placeholder="Room" required className="field" style={{ height: 38, width: 90 }} />
+                    <input name="room" placeholder="Room" required defaultValue={guessRoomNumber(l.name)} className="field" style={{ height: 38, width: 90 }} />
                     <button type="submit" className="btn btn-primary" style={{ height: 38 }}>Assign</button>
                   </form>
                 )}
