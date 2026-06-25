@@ -43,10 +43,15 @@ export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "
   return "ignore";
 }
 
-/** True if any guest on the reservation is checked in (the real check-in signal). */
+/**
+ * True if the reservation is checked in. Primary signal is the reservation's
+ * top-level status === "checked_in" (verified live for this account); guest-level
+ * guestStatus is kept as a fallback in case an account reports it there instead.
+ */
 export function isCheckedIn(
-  detail: { guestList?: Record<string, { guestStatus?: string }> | null },
+  detail: { status?: string; guestList?: Record<string, { guestStatus?: string }> | null },
 ): boolean {
+  if ((detail?.status ?? "").toLowerCase() === "checked_in") return true;
   const guests = detail?.guestList ? Object.values(detail.guestList) : [];
   return guests.some((g) => g?.guestStatus === "checked_in");
 }

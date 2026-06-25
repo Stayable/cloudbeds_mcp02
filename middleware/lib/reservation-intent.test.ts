@@ -26,15 +26,18 @@ describe("classifyIntent", () => {
 });
 
 describe("isCheckedIn", () => {
-  it("is true when any guest is checked in", () => {
-    expect(isCheckedIn({ guestList: { "1": { guestStatus: "checked_in" } } })).toBe(true);
-    expect(isCheckedIn({ guestList: { "1": { guestStatus: "not_checked_in" }, "2": { guestStatus: "checked_in" } } })).toBe(true);
+  it("is true when the reservation top-level status is checked_in", () => {
+    expect(isCheckedIn({ status: "checked_in" })).toBe(true);
+    expect(isCheckedIn({ status: "checked_in", guestList: { "1": { guestStatus: "not_checked_in" } } })).toBe(true);
   });
-  it("is false when no guest is checked in", () => {
-    expect(isCheckedIn({ guestList: { "1": { guestStatus: "not_checked_in" } } })).toBe(false);
-    expect(isCheckedIn({ guestList: { "1": { guestStatus: "checked_out" } } })).toBe(false);
+  it("is true when any guest is checked in (fallback)", () => {
+    expect(isCheckedIn({ status: "confirmed", guestList: { "1": { guestStatus: "checked_in" } } })).toBe(true);
   });
-  it("is false for missing/empty guest list", () => {
+  it("is false when not checked in", () => {
+    expect(isCheckedIn({ status: "confirmed", guestList: { "1": { guestStatus: "not_checked_in" } } })).toBe(false);
+    expect(isCheckedIn({ status: "checked_out" })).toBe(false);
+  });
+  it("is false for missing/empty data", () => {
     expect(isCheckedIn({})).toBe(false);
     expect(isCheckedIn({ guestList: null })).toBe(false);
   });
