@@ -191,6 +191,8 @@ export interface ReservationDetail {
   endDate?: string;
   guestName?: string;
   balance?: number | string; // amount still owed; 0 (or credit) = paid in full
+  // Guest-level check-in state lives here (guestStatus: checked_in / not_checked_in).
+  guestList?: Record<string, { guestStatus?: string; [k: string]: unknown }>;
   rooms?: ReservationRoom[];
   [key: string]: unknown;
 }

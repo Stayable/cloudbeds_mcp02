@@ -1,21 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { classifyIntent, reservationNoteBody, isPaidInFull } from "./reservation-intent";
+import { classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn } from "./reservation-intent";
 
-describe("classifyIntent (check-in only)", () => {
-  it("creates a code when the guest checks in", () => {
-    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "checked_in" })).toBe("ensure");
+describe("classifyIntent", () => {
+  // Cloudbeds check-in lives in guestStatus, and the status_changed payload's
+  // top-level status stays "confirmed" — so ANY status_changed routes to the
+  // ensure flow, which fetches the reservation and gates on checked-in + paid.
+  it("routes status_changed to ensure regardless of thin status (incl. confirmed)", () => {
+    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "confirmed" })).toBe("ensure");
+    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r" })).toBe("ensure");
   });
 
-  it("does NOT create a code at booking/confirmation", () => {
-    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "confirmed" })).toBe("ignore");
-    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "not_confirmed" })).toBe("ignore");
-  });
-
-  it("does NOT create a code on reservation creation", () => {
+  it("does NOT act on a booking (created)", () => {
     expect(classifyIntent({ event: "reservation/created", propertyID: 1, reservationID: "r" })).toBe("ignore");
   });
 
-  it("revokes on checkout, cancel, no-show", () => {
+  it("revokes on checkout, cancel, no-show (status carries through)", () => {
     expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "checked_out" })).toBe("revoke");
     expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "canceled" })).toBe("revoke");
     expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "no_show" })).toBe("revoke");
@@ -24,9 +23,20 @@ describe("classifyIntent (check-in only)", () => {
   it("revokes on reservation deletion", () => {
     expect(classifyIntent({ event: "reservation/deleted", propertyID: 1, reservationID: "r" })).toBe("revoke");
   });
+});
 
-  it("ignores anything else", () => {
-    expect(classifyIntent({ event: "reservation/status_changed", propertyID: 1, reservationID: "r", status: "whatever" })).toBe("ignore");
+describe("isCheckedIn", () => {
+  it("is true when any guest is checked in", () => {
+    expect(isCheckedIn({ guestList: { "1": { guestStatus: "checked_in" } } })).toBe(true);
+    expect(isCheckedIn({ guestList: { "1": { guestStatus: "not_checked_in" }, "2": { guestStatus: "checked_in" } } })).toBe(true);
+  });
+  it("is false when no guest is checked in", () => {
+    expect(isCheckedIn({ guestList: { "1": { guestStatus: "not_checked_in" } } })).toBe(false);
+    expect(isCheckedIn({ guestList: { "1": { guestStatus: "checked_out" } } })).toBe(false);
+  });
+  it("is false for missing/empty guest list", () => {
+    expect(isCheckedIn({})).toBe(false);
+    expect(isCheckedIn({ guestList: null })).toBe(false);
   });
 });
 

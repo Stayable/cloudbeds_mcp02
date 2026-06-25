@@ -22,6 +22,7 @@ import {
   classifyIntent,
   reservationNoteBody,
   isPaidInFull,
+  isCheckedIn,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
@@ -76,13 +77,11 @@ export async function ensurePasscodes(
 
   const detail = await getReservation(registry, propertyId, reservationId);
   const roomIds = extractRoomIds(detail);
-  // RISE8 rule: a code is only created when checked-in AND paid in full.
+  // RISE8 rule: a code is created only when the guest is CHECKED IN and PAID.
+  // Check-in is a guest-level state (guestStatus); the webhook's top-level status
+  // stays "confirmed", so we read it from the fetched reservation, not the payload.
+  const checkedIn = isCheckedIn(detail);
   const paidInFull = isPaidInFull(detail.balance);
-  // Prefer the precise dates from the reservation detail; fall back to payload.
-  const { startTs, endTs } = validityWindow(
-    detail.startDate ?? payload.startDate,
-    detail.endDate ?? payload.endDate,
-  );
 
   const result: SyncResult = {
     action: "ensure",
@@ -91,6 +90,24 @@ export async function ensurePasscodes(
     pinsRevoked: 0,
     unmappedRooms: [],
   };
+
+  // status_changed fires on many edits; only act once the guest is in-house.
+  if (!checkedIn) {
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId,
+        action: "awaiting_checkin",
+        detail: { reservationId, status: detail.status ?? null },
+      },
+    });
+    return result;
+  }
+
+  // Prefer the precise dates from the reservation detail; fall back to payload.
+  const { startTs, endTs } = validityWindow(
+    detail.startDate ?? payload.startDate,
+    detail.endDate ?? payload.endDate,
+  );
 
   for (const roomId of roomIds) {
     // Reflect occupancy + guest on the room so the lock-app shows guest details

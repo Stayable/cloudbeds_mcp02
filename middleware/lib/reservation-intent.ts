@@ -17,15 +17,18 @@ export interface ReservationWebhookPayload {
   status?: string;
 }
 
-/** The only status that should provision a code. */
-const ACTIVE_STATUSES = new Set(["checked_in"]);
 /** Statuses (or events) that mean any issued code must be revoked. */
 const REMOVED_STATUSES = new Set(["canceled", "cancelled", "checked_out", "no_show"]);
 
 /**
- * Decide what a given event/status implies for this reservation's codes.
- * Check-in only: confirmed/not_confirmed/created all return "ignore" so no code
- * is minted before the guest actually checks in.
+ * Decide what a given event implies for this reservation's codes.
+ *
+ * Cloudbeds tracks check-in at the GUEST level (`guestStatus`); the
+ * status_changed payload's top-level `status` stays "confirmed" even on
+ * check-in. So we can't decide create-vs-not from the thin payload — instead any
+ * `status_changed` routes to "ensure", which fetches the reservation and gates on
+ * checked-in (isCheckedIn) + paid (isPaidInFull). Checkout/cancel/no-show DO
+ * change the top-level status, so those (and deleted) revoke directly.
  */
 export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "revoke" | "ignore" {
   const event = payload.event ?? "";
@@ -33,10 +36,19 @@ export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "
 
   const status = (payload.status ?? "").toLowerCase();
   if (status && REMOVED_STATUSES.has(status)) return "revoke";
-  if (status && ACTIVE_STATUSES.has(status)) return "ensure";
 
-  // Booking/confirmation events do NOT create a code under the check-in policy.
+  if (event.includes("status_changed")) return "ensure";
+
+  // Bookings (created) and everything else: do nothing until a status change.
   return "ignore";
+}
+
+/** True if any guest on the reservation is checked in (the real check-in signal). */
+export function isCheckedIn(
+  detail: { guestList?: Record<string, { guestStatus?: string }> | null },
+): boolean {
+  const guests = detail?.guestList ? Object.values(detail.guestList) : [];
+  return guests.some((g) => g?.guestStatus === "checked_in");
 }
 
 /**
