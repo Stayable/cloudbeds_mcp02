@@ -133,6 +133,127 @@ export async function listLocks(pageNo = 1, pageSize = 100): Promise<{ total: nu
   return { total: body.total ?? 0, list: body.list ?? [] };
 }
 
+/**
+ * Full detail for a single lock. /v3/lock/detail returns more than the list
+ * row — firmware/model, battery, timezone, and a `featureValue` bitmask that
+ * encodes which capabilities (remote unlock, passcode, IC card, fingerprint,
+ * gateway, audit records, etc.) the hardware actually supports.
+ */
+export async function getLockDetail(lockId: number | bigint): Promise<any> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/detail", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    date: Date.now(),
+  });
+  assertOk(body, "lock/detail");
+  return body;
+}
+
+/** Current battery percentage for a lock (0–100). */
+export async function getBattery(lockId: number | bigint): Promise<number> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/queryElectricQuantity", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    date: Date.now(),
+  });
+  assertOk(body, "lock/queryElectricQuantity");
+  return body.electricQuantity ?? -1;
+}
+
+/**
+ * Query whether a lock is currently locked/unlocked. REQUIRES a gateway (or the
+ * lock must be a WiFi lock) — a pure-Bluetooth lock with no gateway returns an
+ * error because the cloud can't reach it. state: 0=locked, 1=unlocked, 2=unknown.
+ */
+export async function getOpenState(lockId: number | bigint): Promise<{ state: number }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/queryOpenState", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    date: Date.now(),
+  });
+  assertOk(body, "lock/queryOpenState");
+  return { state: body.state ?? 2 };
+}
+
+/** Gateways the account owns. isOnline + lockNum tell us bridge health/coverage. */
+export async function listGateways(pageNo = 1, pageSize = 100): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/gateway/list", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "gateway/list");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
+/** Gateways a specific lock can talk through (each carries its own isOnline). */
+export async function listGatewaysForLock(lockId: number | bigint): Promise<any[]> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/listGateway", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    date: Date.now(),
+  });
+  assertOk(body, "lock/listGateway");
+  return body.list ?? [];
+}
+
+/** Existing keyboard passcodes on a lock (what PINs are currently provisioned). */
+export async function listPasscodes(
+  lockId: number | bigint,
+  pageNo = 1,
+  pageSize = 100,
+): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/listKeyboardPwd", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "lock/listKeyboardPwd");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
+/**
+ * Unlock/access history for a lock (the audit trail): who opened it, how
+ * (passcode / app / IC card / fingerprint), and when. recordType filters the
+ * source; omit for everything. Needs a gateway to be uploaded to the cloud.
+ */
+export async function listLockRecords(
+  lockId: number | bigint,
+  startDate: number,
+  endDate: number,
+  pageNo = 1,
+  pageSize = 100,
+): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lockRecord/list", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    startDate,
+    endDate,
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "lockRecord/list");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
 export interface CreatePasscodeArgs {
   lockId: number | bigint;
   /** 4-9 digit PIN. */
