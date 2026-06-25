@@ -11,6 +11,7 @@ export const PERMISSIONS = [
   "backup_code.reveal",
   "backup_code.rotate",
   "lock.sync",
+  "lock.discover",
   "devices.view",
   "lock.mark_registered",
   "mapping.edit",

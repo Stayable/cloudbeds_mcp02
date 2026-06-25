@@ -23,9 +23,10 @@ export default function Sidebar({ user, currentProperty }: { user: SessionUser; 
       <hr style={{ borderColor: "#1d3557", margin: "12px 0" }} />
       <Link href="/portfolio" style={{ ...navLink, color: "#FDDA24" }}>← Portfolio</Link>
 
-      {(sessionCan(user, "settings.manage") || sessionCan(user, "users.manage")) && (
+      {(sessionCan(user, "settings.manage") || sessionCan(user, "users.manage") || sessionCan(user, "lock.discover")) && (
         <>
           <hr style={{ borderColor: "#1d3557", margin: "12px 0" }} />
+          {sessionCan(user, "lock.discover") && <Link href="/unassigned" style={navLink}>Unassigned locks</Link>}
           {sessionCan(user, "settings.manage") && <Link href="/settings" style={navLink}>Settings</Link>}
           {sessionCan(user, "users.manage") && <Link href="/users" style={navLink}>Users</Link>}
         </>

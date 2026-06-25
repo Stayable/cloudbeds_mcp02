@@ -8,18 +8,19 @@ export interface Property {
   id: string; // real Cloudbeds propertyID
   name: string;
   streetCode: string; // legacy street-address code (display/reference only)
+  abbr: string; // lock-naming abbreviation, e.g. "KE" in "KE-105"
   timezone: string;
 }
 
 export const PROPERTIES: Property[] = [
-  { id: "206628", name: "Jacksonville North", streetCode: "812", timezone: "America/New_York" },
-  { id: "210987", name: "Jacksonville West", streetCode: "6802", timezone: "America/New_York" },
-  { id: "210986", name: "Kissimmee East", streetCode: "2295", timezone: "America/New_York" },
-  { id: "210969", name: "Kissimmee West", streetCode: "5399", timezone: "America/New_York" },
-  { id: "210972", name: "Lakeland", streetCode: "4645", timezone: "America/New_York" },
-  { id: "210971", name: "Orlando OBT", streetCode: "8700", timezone: "America/New_York" },
-  { id: "208155", name: "St. Augustine", streetCode: "2535", timezone: "America/New_York" },
-  { id: "318197", name: "Davenport", streetCode: "44199", timezone: "America/New_York" },
+  { id: "206628", name: "Jacksonville North", streetCode: "812", abbr: "JN", timezone: "America/New_York" },
+  { id: "210987", name: "Jacksonville West", streetCode: "6802", abbr: "JW", timezone: "America/New_York" },
+  { id: "210986", name: "Kissimmee East", streetCode: "2295", abbr: "KE", timezone: "America/New_York" },
+  { id: "210969", name: "Kissimmee West", streetCode: "5399", abbr: "KW", timezone: "America/New_York" },
+  { id: "210972", name: "Lakeland", streetCode: "4645", abbr: "LL", timezone: "America/New_York" },
+  { id: "210971", name: "Orlando OBT", streetCode: "8700", abbr: "OR", timezone: "America/New_York" },
+  { id: "208155", name: "St. Augustine", streetCode: "2535", abbr: "SA", timezone: "America/New_York" },
+  { id: "318197", name: "Davenport", streetCode: "44199", abbr: "DV", timezone: "America/New_York" },
 ];
 
 export function getProperty(id: string): Property | undefined {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUserOrRedirect, userProperties } from "@/lib/session-access";
+import { requireUserOrRedirect, userProperties, sessionCan } from "@/lib/session-access";
 import { summarizeProperty } from "@/lib/overview";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,13 @@ export default async function PortfolioPage() {
         <p className="subtle">
           Choose a property to manage — {props.length} {props.length === 1 ? "property" : "properties"} in your scope.
         </p>
+        {sessionCan(user, "lock.discover") && (
+          <p style={{ marginTop: 8 }}>
+            <Link href="/unassigned" style={{ color: "#041E42", fontWeight: 600 }}>
+              → Unassigned locks &amp; discovery sync
+            </Link>
+          </p>
+        )}
       </header>
 
       {cards.length > 0 ? (

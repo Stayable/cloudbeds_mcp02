@@ -28,6 +28,20 @@ model LockMap {
   @@unique([propertyId, roomId])
 }
 
+// Discovery queue: locks seen in the TTLock account whose name does not follow
+// the <ABBR>-<room> convention and are not yet mapped. The lock-app lists these
+// for one-click manual assignment. Renaming a lock to the convention removes it
+// from here on the next sync (it becomes a LockMap row instead).
+model UnassignedLock {
+  lockId       BigInt    @id
+  name         String
+  battery      Int?
+  online       Boolean   @default(true)
+  lastSeen     DateTime?
+  discoveredAt DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
 model Passcode {
   id            String   @id @default(cuid())
   reservationId String? // nullable: backup/manual codes have no reservation
