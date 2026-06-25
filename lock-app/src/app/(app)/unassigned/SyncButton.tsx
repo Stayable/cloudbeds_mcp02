@@ -7,11 +7,8 @@ const initial: SyncState = { ran: false };
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      style={{ padding: "8px 14px", background: "#041E42", color: "#fff", border: "none", borderRadius: 6 }}
-    >
+    <button type="submit" disabled={pending} className="btn btn-navy">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M13.5 8a5.5 5.5 0 11-1.6-3.9M13 1.5V5H9.5" /></svg>
       {pending ? "Syncing…" : "Run discovery sync"}
     </button>
   );

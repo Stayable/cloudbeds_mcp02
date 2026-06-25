@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
@@ -6,11 +7,8 @@ import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
 
-const TINT: Record<string, string> = { none: "transparent", amber: "#fff7e6", red: "#fdecea" };
-
 export default async function ActivityPage({
-  params,
-  searchParams,
+  params, searchParams,
 }: {
   params: { propertyId: string };
   searchParams: { search?: string; action?: string };
@@ -26,39 +24,49 @@ export default async function ActivityPage({
   const canExport = sessionCan(user, "activity.export", propertyId);
   const qs = new URLSearchParams(searchParams as Record<string, string>).toString();
 
-  const th = { textAlign: "left", padding: "6px 8px", borderBottom: "2px solid #041E42", color: "#041E42", fontSize: 13 } as const;
-  const td = { padding: "6px 8px", borderBottom: "1px solid #eee", color: "#041E42", fontSize: 13 } as const;
-
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ color: "#041E42" }}>{property.name} — Activity Log</h1>
-        {canExport && <a href={`/p/${propertyId}/activity/export?${qs}`} style={{ padding: "8px 14px", background: "#FDDA24", color: "#041E42", borderRadius: 6, fontWeight: 700, textDecoration: "none" }}>Export CSV</a>}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <h1>Activity log</h1>
+          <p className="subtle" style={{ marginTop: 4 }}>{property.name} · every staff action is recorded; sensitive actions are flagged.</p>
+        </div>
+        <span className="chip chip-warn" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: 9, background: "var(--warn)" }} />= sensitive</span>
+        {canExport && <Link href={`/p/${propertyId}/activity/export?${qs}`} className="btn btn-navy" style={{ height: 38 }}>Export CSV</Link>}
       </div>
-      <form method="get" style={{ display: "flex", gap: 8, margin: "12px 0", flexWrap: "wrap" }}>
-        <input name="search" placeholder="Search actor / room / lock / detail" defaultValue={searchParams.search ?? ""} style={{ padding: 8, border: "1px solid #ccc", borderRadius: 6, minWidth: 280 }} />
-        <input name="action" placeholder="Action (exact)" defaultValue={searchParams.action ?? ""} style={{ padding: 8, border: "1px solid #ccc", borderRadius: 6 }} />
-        <button type="submit" style={{ padding: "8px 16px", background: "#041E42", color: "#fff", border: "none", borderRadius: 6 }}>Filter</button>
+
+      <form method="get" style={{ display: "flex", gap: 8, margin: "0 0 16px", flexWrap: "wrap" }}>
+        <input name="search" placeholder="Search actor / room / lock / detail" defaultValue={searchParams.search ?? ""} className="field" style={{ height: 38, minWidth: 280 }} />
+        <input name="action" placeholder="Action (exact)" defaultValue={searchParams.action ?? ""} className="field" style={{ height: 38 }} />
+        <button type="submit" className="btn btn-navy" style={{ height: 38 }}>Filter</button>
       </form>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr><th style={th}>Time (UTC)</th><th style={th}>Actor</th><th style={th}>Action</th><th style={th}>Room</th><th style={th}>Lock</th><th style={th}>Detail</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} style={{ background: TINT[rowTint(r)] }}>
-              <td style={td}>{r.createdAt.toISOString().slice(0, 16).replace("T", " ")}</td>
-              <td style={td}>{r.actorEmail ?? `system (${r.source})`}</td>
-              <td style={td}>{r.action}</td>
-              <td style={td}>{r.roomId ?? "—"}</td>
-              <td style={td}>{r.lockId ?? "—"}</td>
-              <td style={td}>{r.detail}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length === 0 && <p style={{ marginTop: 16 }}>No activity matches.</p>}
+      <div className="table-wrap">
+        {rows.length === 0 ? (
+          <div style={{ padding: 28, textAlign: "center", color: "var(--muted)" }}>No activity matches.</div>
+        ) : rows.map((r) => {
+          const tint = rowTint(r);
+          const dot = tint === "red" ? "var(--crit)" : tint === "amber" ? "var(--warn)" : "#C2CBDA";
+          const initials = (r.actorEmail ?? r.source).slice(0, 2).toUpperCase();
+          return (
+            <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 18px", borderBottom: "1px solid var(--divider)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 9, background: dot, marginTop: 6, flex: "0 0 auto" }} />
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: "#EAEFF6", color: "var(--ink-2)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto", fontFamily: "var(--font-display-stack)", fontWeight: 600, fontSize: 12 }}>{initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
+                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{r.actorEmail ?? `system (${r.source})`}</span>{" "}
+                  {r.action}{" "}
+                  {r.roomId && <span className="mono" style={{ color: "#1E5FB0" }}>{r.roomId}</span>}
+                </div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginTop: 5 }}>
+                  {r.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC{r.detail ? ` · ${r.detail}` : ""}
+                </div>
+              </div>
+              {tint === "amber" && <span className="chip chip-warn">SENSITIVE</span>}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
