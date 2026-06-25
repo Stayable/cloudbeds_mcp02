@@ -75,19 +75,19 @@ export async function ensurePasscodes(
   const propertyId = String(payload.propertyID);
   const reservationId = payload.reservationID;
 
+  // Trust the webhook payload's status when it already says checked-in (no read lag).
+  const payloadCheckedIn = (payload.status ?? "").toLowerCase() === "checked_in";
   let detail = await getReservation(registry, propertyId, reservationId);
-  // Cloudbeds' read can briefly lag the status_changed webhook (returns the
-  // pre-change status for a few seconds). Retry until the check-in is visible so
-  // we don't drop a real check-in as awaiting_checkin.
-  for (let attempt = 0; attempt < 4 && !isCheckedIn(detail); attempt++) {
+  // Otherwise the read can briefly lag the status_changed webhook (returns the
+  // pre-change status for a few seconds) — retry until the check-in is visible.
+  for (let attempt = 0; attempt < 4 && !payloadCheckedIn && !isCheckedIn(detail); attempt++) {
     await new Promise((r) => setTimeout(r, 3000));
     detail = await getReservation(registry, propertyId, reservationId);
   }
   const roomIds = extractRoomIds(detail);
-  // RISE8 rule: a code is created only when the guest is CHECKED IN and PAID.
-  // Check-in is a guest-level state (guestStatus); the webhook's top-level status
-  // stays "confirmed", so we read it from the fetched reservation, not the payload.
-  const checkedIn = isCheckedIn(detail);
+  // RISE8 rule: a code is created only when CHECKED IN and PAID. Check-in is read
+  // from the payload status or the reservation (top-level status / guestStatus).
+  const checkedIn = payloadCheckedIn || isCheckedIn(detail);
   const paidInFull = isPaidInFull(detail.balance);
 
   const result: SyncResult = {
