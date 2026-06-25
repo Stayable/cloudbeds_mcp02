@@ -90,6 +90,23 @@ export async function listLocks(pageNo = 1, pageSize = 100): Promise<{ total: nu
   return { total: body.total ?? 0, list: body.list ?? [] };
 }
 
+/**
+ * Rename a lock in the TTLock account (sets lockAlias). Used by the lock-app to
+ * apply the <ABBR>-<room> convention from the Unassigned queue so the TTLock name
+ * stays the source of truth — no need to open the TTLock app.
+ */
+export async function renameLock(lockId: number | bigint, name: string): Promise<void> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/lock/rename", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    lockAlias: name,
+    date: Date.now(),
+  });
+  assertOk(body, "lock/rename");
+}
+
 export interface CreatePasscodeArgs {
   lockId: number | bigint;
   passcode: string;

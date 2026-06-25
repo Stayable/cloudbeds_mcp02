@@ -24,8 +24,10 @@ export default async function UnassignedPage() {
       <h1 style={{ color: "#041E42" }}>Unassigned locks</h1>
       <p style={{ color: "#444", maxWidth: 720 }}>
         Locks found in the TTLock account whose name does not follow the{" "}
-        <code>ABBR-room</code> convention (e.g. <code>KE-105</code>). Rename a lock in the
-        TTLock app and re-run the sync to auto-file it, or assign it here.
+        <code>ABBR-room</code> convention (e.g. <code>KE-105</code>). Assign one here —
+        it renames the lock in TTLock to the canonical name and maps it in one step,
+        so you never have to open the TTLock app. (Renaming a lock in the TTLock app
+        and re-running the sync also works.)
       </p>
 
       <div style={{ margin: "16px 0" }}>
@@ -39,7 +41,7 @@ export default async function UnassignedPage() {
             <th style={th}>Lock ID</th>
             <th style={th}>Battery</th>
             <th style={th}>Discovered</th>
-            {canAssign && <th style={th}>Assign to</th>}
+            {canAssign && <th style={th}>Assign (renames in TTLock)</th>}
           </tr>
         </thead>
         <tbody>

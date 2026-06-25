@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseLockName, classifyLock } from "./lock-naming";
+import { parseLockName, classifyLock, canonicalLockName } from "./lock-naming";
 
 describe("parseLockName", () => {
   it("maps a conforming name to property + room", () => {
@@ -51,5 +51,30 @@ describe("classifyLock", () => {
 
   it("keeps a non-conforming lock that is already mapped (never re-queue a manual mapping)", () => {
     expect(classifyLock("lobby-HVAC unit room", true)).toEqual({ kind: "keep" });
+  });
+});
+
+describe("canonicalLockName", () => {
+  it("builds <ABBR>-<room> from a property + room", () => {
+    expect(canonicalLockName("210986", "105")).toBe("KE-105");
+    expect(canonicalLockName("210972", "202")).toBe("LL-202");
+  });
+
+  it("trims the room token", () => {
+    expect(canonicalLockName("210986", "  105 ")).toBe("KE-105");
+  });
+
+  it("round-trips with parseLockName", () => {
+    const name = canonicalLockName("210987", "1-A");
+    expect(name).toBe("JW-1-A");
+    expect(parseLockName(name!)).toEqual({ propertyId: "210987", room: "1-A" });
+  });
+
+  it("returns null for an unknown property", () => {
+    expect(canonicalLockName("999999", "105")).toBeNull();
+  });
+
+  it("returns null for an empty room", () => {
+    expect(canonicalLockName("210986", "  ")).toBeNull();
   });
 });

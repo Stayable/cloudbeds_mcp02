@@ -12,6 +12,19 @@ import { PROPERTIES } from "./properties";
 
 // abbr (uppercased) -> Cloudbeds propertyID
 const ABBR_TO_PROPERTY = new Map(PROPERTIES.map((p) => [p.abbr.toUpperCase(), p.id]));
+// Cloudbeds propertyID -> abbr
+const PROPERTY_TO_ABBR = new Map(PROPERTIES.map((p) => [p.id, p.abbr]));
+
+/**
+ * Build the canonical lock name `<ABBR>-<room>` for a property + room, or null
+ * if the property is unknown or the room is empty. Inverse of parseLockName.
+ */
+export function canonicalLockName(propertyId: string, room: string): string | null {
+  const abbr = PROPERTY_TO_ABBR.get(propertyId);
+  const trimmed = room.trim();
+  if (!abbr || !trimmed) return null;
+  return `${abbr}-${trimmed}`;
+}
 
 export interface ParsedLockName {
   propertyId: string;
