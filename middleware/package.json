@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -16,19 +17,20 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^5.10.0",
     "next": "^14.2.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@prisma/client": "^5.10.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.2.0",
-    "prisma": "^5.10.0"
+    "prisma": "^5.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=18"

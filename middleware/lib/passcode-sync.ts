@@ -14,19 +14,19 @@ import {
   CloudbedsRegistry,
   extractRoomIds,
   getReservation,
+  postReservationNote,
+  roomNameFor,
 } from "./cloudbeds";
 import { createPasscode, deletePasscode } from "./ttlock";
+import {
+  classifyIntent,
+  reservationNoteBody,
+  type ReservationWebhookPayload,
+} from "./reservation-intent";
 
-/** Minimal shape of a Cloudbeds reservation webhook payload (it is THIN). */
-export interface ReservationWebhookPayload {
-  event: string;
-  propertyID: number | string;
-  propertyID_str?: string;
-  reservationID: string;
-  startDate?: string;
-  endDate?: string;
-  status?: string;
-}
+// Re-exported so existing importers (the webhook route) keep working.
+export { classifyIntent };
+export type { ReservationWebhookPayload };
 
 export interface SyncResult {
   action: string;
@@ -61,11 +61,6 @@ function validityWindow(startDate?: string, endDate?: string): { startTs: number
   }
   return { startTs: start, endTs: end };
 }
-
-/** Statuses that mean the guest should currently hold a working code. */
-const ACTIVE_STATUSES = new Set(["confirmed", "checked_in", "not_confirmed"]);
-/** Statuses (or events) that mean any issued code must be revoked. */
-const REMOVED_STATUSES = new Set(["canceled", "cancelled", "checked_out", "no_show"]);
 
 /**
  * Ensure the guest holds a valid PIN on every mapped room of a reservation.
@@ -155,6 +150,38 @@ export async function ensurePasscodes(
           detail: { reservationId, keyboardPwdId: String(keyboardPwdId) },
         },
       });
+
+      // Surface the code on the Cloudbeds reservation as a note. Best-effort: a
+      // note failure must NOT lose the PIN (the row now exists, so a retry would
+      // skip creation and never re-post), so we log it and continue.
+      try {
+        await postReservationNote(
+          registry,
+          propertyId,
+          reservationId,
+          reservationNoteBody({
+            pin,
+            roomName: roomNameFor(detail, roomId) ?? roomId,
+            startDate: detail.startDate ?? payload.startDate,
+            endDate: detail.endDate ?? payload.endDate,
+          }),
+        );
+        await prisma.eventLog.create({
+          data: {
+            source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+            action: "reservation_note_posted",
+            detail: { reservationId },
+          },
+        });
+      } catch (noteErr: any) {
+        await prisma.eventLog.create({
+          data: {
+            source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+            action: "reservation_note_failed",
+            detail: { reservationId, error: noteErr?.message ?? String(noteErr) },
+          },
+        });
+      }
     } catch (err: any) {
       await prisma.eventLog.create({
         data: {
@@ -217,18 +244,4 @@ export async function revokePasscodes(
   }
 
   return result;
-}
-
-/** Decide what a given event/status implies for this reservation's codes. */
-export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "revoke" | "ignore" {
-  const event = payload.event ?? "";
-  if (event.includes("deleted")) return "revoke";
-
-  const status = (payload.status ?? "").toLowerCase();
-  if (status && REMOVED_STATUSES.has(status)) return "revoke";
-  if (status && ACTIVE_STATUSES.has(status)) return "ensure";
-
-  // created (no status) → ensure; status_changed to something unknown → ignore.
-  if (event.includes("created")) return "ensure";
-  return "ignore";
 }

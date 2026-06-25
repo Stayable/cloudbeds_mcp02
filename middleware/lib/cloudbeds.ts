@@ -79,6 +79,21 @@ export class CloudbedsClient {
     return this.parse<T>(res);
   }
 
+  /** Form-encoded POST (Cloudbeds write endpoints, e.g. postReservationNote). */
+  async post<T = unknown>(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<CloudbedsResponse<T>> {
+    const url = `${this.config.baseUrl}/${method}`;
+    const body = new URLSearchParams(this.clean(params)).toString();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: this.headers({ "Content-Type": "application/x-www-form-urlencoded" }),
+      body,
+    });
+    return this.parse<T>(res);
+  }
+
   private async parse<T>(res: Response): Promise<CloudbedsResponse<T>> {
     const requestId = res.headers.get("x-request-id");
     const text = await res.text();
@@ -207,4 +222,27 @@ export function extractRoomIds(detail: ReservationDetail): string[] {
     .map((r) => (r?.roomID != null ? String(r.roomID).trim() : ""))
     .filter((id) => id.length > 0);
   return [...new Set(ids)];
+}
+
+/** Human room name (e.g. "239") for a Cloudbeds roomID, if the detail has it. */
+export function roomNameFor(detail: ReservationDetail, roomId: string): string | undefined {
+  const rooms = Array.isArray(detail.rooms) ? detail.rooms : [];
+  const match = rooms.find((r) => String(r?.roomID ?? "").trim() === roomId);
+  return match?.roomName;
+}
+
+/**
+ * Post a note onto a Cloudbeds reservation (WRITE — needs write:reservation).
+ * Used to surface the guest door code on the reservation. Cloudbeds expects the
+ * note text under `reservationNote` (not `note`).
+ */
+export async function postReservationNote(
+  registry: CloudbedsRegistry,
+  propertyID: string,
+  reservationID: string,
+  note: string,
+): Promise<void> {
+  await registry
+    .resolve(propertyID)
+    .post("postReservationNote", { propertyID, reservationID, reservationNote: note });
 }
