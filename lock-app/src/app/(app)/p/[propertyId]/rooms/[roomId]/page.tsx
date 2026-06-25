@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
@@ -12,9 +13,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const NAVY = "#041E42";
-const btn = { padding: "8px 16px", color: "#fff", background: NAVY, border: "none", borderRadius: 6 } as const;
-
 export default async function DoorDetailPage({ params }: { params: { propertyId: string; roomId: string } }) {
   const { propertyId, roomId } = params;
   const user = await requireUserOrRedirect();
@@ -22,9 +20,10 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
   const property = getProperty(propertyId);
   if (!property) return <Forbidden what="this property" />;
 
-  const [map, codes] = await Promise.all([
+  const [map, codes, state] = await Promise.all([
     prisma.lockMap.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } }),
     prisma.passcode.findMany({ where: { propertyId, roomId } }),
+    prisma.roomState.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } }),
   ]);
   const rows: PasscodeInput[] = codes.map((c) => ({
     keyboardPwdId: String(c.keyboardPwdId), pin: c.pin, type: c.type, status: c.status,
@@ -32,110 +31,150 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
     reservationId: c.reservationId, createdAt: c.createdAt.getTime(),
   }));
   const { guest, backup, manual, history } = splitCodes(rows, Date.now());
-
   const can = (p: Parameters<typeof sessionCan>[1]) => sessionCan(user, p, propertyId);
 
+  const battery = map?.battery ?? null;
+  const battColor = battery == null ? "var(--faint)" : battery < 20 ? "var(--crit-ink)" : "var(--ink)";
+  const label = map?.alias?.trim() || roomId;
+
   return (
-    <div style={{ color: NAVY, maxWidth: 760 }}>
-      <a href={`/p/${propertyId}/rooms`} style={{ color: NAVY }}>← {property.name} Rooms</a>
-      <h1>Room {map?.alias?.trim() || roomId}</h1>
+    <div>
+      <Link href={`/p/${propertyId}/rooms`} className="backlink">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M10 13L5 8l5-5" /></svg>All rooms
+      </Link>
 
-      {!map && (
-        <p style={{ color: "#b9770e" }}>This room is not mapped to a lock. Map it below to manage codes.</p>
-      )}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div className="display tnum" style={{ fontSize: 28, fontWeight: 700, color: "var(--ink)", letterSpacing: "-.01em" }}>{label}</div>
+        <span className={`pill ${state?.guestName ? "pill-warn" : "pill-muted"}`}>{state?.guestName ? "Occupied" : "Vacant"}</span>
+        {map && <span className={`pill ${map.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{map.online ? "online" : "offline"}</span>}
+        <div style={{ flex: 1 }} />
+        {state?.guestName && (
+          <div style={{ textAlign: "right" }}><div className="eyebrow">GUEST</div><div style={{ fontWeight: 600, fontSize: 14, marginTop: 3 }}>{state.guestName}{state.checkoutDate ? ` · out ${state.checkoutDate}` : ""}</div></div>
+        )}
+      </div>
 
-      {/* Guest code panel (navy) */}
-      <section style={{ background: NAVY, color: "#fff", borderRadius: 10, padding: 16, marginTop: 12 }}>
-        <h2 style={{ color: "#FDDA24", marginTop: 0 }}>Guest code</h2>
-        {guest ? (
-          <>
-            <div>Code: {can("guest_code.reveal")
-              ? <RevealButton label={`Reveal ${guest.maskedPin}`} action={async () => { "use server"; return revealGuestCode(propertyId, roomId); }} />
-              : <code>{guest.maskedPin}</code>}</div>
-            <div style={{ fontSize: 13, marginTop: 6 }}>{guest.window}{guest.reservationId ? ` · res ${guest.reservationId}` : ""}</div>
-            {can("guest_code.revoke") && (
-              <form action={async () => { "use server"; await revokeGuestCode(propertyId, roomId); }} style={{ marginTop: 10 }}>
-                <button style={{ ...btn, background: "#c0392b" }}>Revoke</button>
+      {!map && <div className="card accent-warn" style={{ marginBottom: 16, color: "var(--warn-ink)" }}>This room is not mapped to a lock. Map it below to manage codes.</div>}
+
+      <div className="two-col">
+        {/* LEFT: codes */}
+        <div className="col">
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <span className="card-title">Active guest PIN</span>
+              {guest && <span className="chip chip-ok">{guest.window}</span>}
+            </div>
+            {guest ? (
+              <>
+                <div className="pin-block">
+                  <div className="pin-value">
+                    {can("guest_code.reveal")
+                      ? <RevealButton label={`Reveal ${guest.maskedPin}`} action={async () => { "use server"; return revealGuestCode(propertyId, roomId); }} />
+                      : guest.maskedPin}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  {can("guest_code.revoke") && (
+                    <form action={async () => { "use server"; await revokeGuestCode(propertyId, roomId); }} style={{ flex: 1 }}>
+                      <button className="btn btn-danger" style={{ width: "100%" }}>Revoke code</button>
+                    </form>
+                  )}
+                  {can("lock.sync") && map && (
+                    <form action={async () => { "use server"; await syncFromLock(propertyId, roomId); }} style={{ flex: 1 }}>
+                      <button className="btn btn-ghost" style={{ width: "100%" }}>Sync from lock</button>
+                    </form>
+                  )}
+                </div>
+                {guest.reservationId && <div className="subtle" style={{ marginTop: 10, fontSize: 12 }}>Reservation {guest.reservationId}</div>}
+              </>
+            ) : <p className="subtle">No active guest code.</p>}
+          </div>
+
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <span className="card-title">Staff backup PIN</span><span className="chip chip-warn">SENSITIVE · OFFLINE</span>
+            </div>
+            {backup ? (
+              <div className="pin-value mono" style={{ color: "var(--ink)", fontSize: 24 }}>
+                {can("backup_code.reveal")
+                  ? <RevealButton variant="onLight" label={`Reveal ${backup.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId); }} />
+                  : backup.maskedPin}
+              </div>
+            ) : <p className="subtle">No backup code set.</p>}
+            {can("backup_code.rotate") && map && (
+              <form action={async () => { "use server"; await rotateBackupCode(propertyId, roomId); }} style={{ marginTop: 14 }}>
+                <button className="btn btn-navy">{backup ? "Rotate" : "Create backup code"}</button>
               </form>
             )}
-          </>
-        ) : <p>No active guest code.</p>}
+          </div>
 
-        {can("guest_code.generate_manual") && map && (
-          <form action={generateManualCode} style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="hidden" name="propertyId" value={propertyId} />
-            <input type="hidden" name="roomId" value={roomId} />
-            <label style={{ fontSize: 13 }}>Manual code for
-              <input name="hours" type="number" min={1} defaultValue={24} style={{ width: 64, margin: "0 6px", padding: 4 }} />h</label>
-            <button style={btn}>Generate</button>
-          </form>
-        )}
-
-        {can("lock.sync") && map && (
-          <form action={async () => { "use server"; await syncFromLock(propertyId, roomId); }} style={{ marginTop: 10 }}>
-            <button style={{ ...btn, background: "#456" }}>Sync from lock</button>
-          </form>
-        )}
-      </section>
-
-      {/* Staff backup code panel (gold dashed) */}
-      <section style={{ border: "2px dashed #FDDA24", borderRadius: 10, padding: 16, marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Staff backup code <span style={{ fontSize: 12, color: "#456" }}>(works offline)</span></h2>
-        {backup ? (
-          <div>{can("backup_code.reveal")
-            ? <RevealButton label={`Reveal ${backup.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId); }} />
-            : <code>{backup.maskedPin}</code>}</div>
-        ) : <p>No backup code set.</p>}
-        {can("backup_code.rotate") && map && (
-          <form action={async () => { "use server"; await rotateBackupCode(propertyId, roomId); }} style={{ marginTop: 10 }}>
-            <button style={btn}>{backup ? "Rotate" : "Create backup code"}</button>
-          </form>
-        )}
-      </section>
-
-      {/* Manual codes */}
-      {manual.length > 0 && (
-        <section style={{ marginTop: 16 }}>
-          <h3>Manual codes</h3>
-          <ul>{manual.map((m) => <li key={m.keyboardPwdId}>{m.maskedPin} · {m.window}</li>)}</ul>
-        </section>
-      )}
-
-      {/* Code history */}
-      <section style={{ marginTop: 16 }}>
-        <h3>Code history</h3>
-        {history.length === 0 ? <p>None.</p> : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr style={{ textAlign: "left", borderBottom: `1px solid ${NAVY}` }}>
-              <th>Code</th><th>Type</th><th>Status</th><th>Window</th><th>Reservation</th>
-            </tr></thead>
-            <tbody>{history.map((h) => (
-              <tr key={h.keyboardPwdId} style={{ borderBottom: "1px solid #e3e8ef" }}>
-                <td>{h.maskedPin}</td><td>{h.type}</td><td>{h.status}</td><td>{h.window}</td><td>{h.reservationId ?? "—"}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </section>
-
-      {/* Mapping CRUD */}
-      {can("mapping.edit") && (
-        <section style={{ marginTop: 16, borderTop: `1px solid ${NAVY}`, paddingTop: 12 }}>
-          <h3>Lock mapping</h3>
-          <form action={upsertMapping} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <input type="hidden" name="propertyId" value={propertyId} />
-            <input type="hidden" name="roomId" value={roomId} />
-            <input name="lockId" placeholder="TTLock Lock ID" defaultValue={map ? String(map.lockId) : ""} style={{ padding: 6, border: "1px solid #ccc", borderRadius: 6 }} />
-            <input name="alias" placeholder="Alias (optional)" defaultValue={map?.alias ?? ""} style={{ padding: 6, border: "1px solid #ccc", borderRadius: 6 }} />
-            <button style={btn}>{map ? "Update mapping" : "Create mapping"}</button>
-          </form>
-          {map && (
-            <form action={async () => { "use server"; await deleteMapping(propertyId, roomId); }} style={{ marginTop: 8 }}>
-              <button style={{ ...btn, background: "#c0392b" }}>Remove mapping</button>
-            </form>
+          {can("guest_code.generate_manual") && map && (
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: 14 }}>Generate a manual code</div>
+              <form action={generateManualCode} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <input type="hidden" name="propertyId" value={propertyId} />
+                <input type="hidden" name="roomId" value={roomId} />
+                <div><label className="lbl">VALID FOR (HOURS)</label><input name="hours" type="number" min={1} defaultValue={24} className="field" style={{ width: 100, height: 44 }} /></div>
+                <button className="btn btn-primary" style={{ height: 44, flex: 1 }}>Generate code</button>
+              </form>
+            </div>
           )}
-        </section>
-      )}
+        </div>
+
+        {/* RIGHT: health + mapping + history */}
+        <div className="col">
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: 16 }}>Lock health</div>
+            {map ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                  <span className={`pill ${map.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{map.online ? "online" : "offline"}</span>
+                  {map.lastSeen && <span className="subtle" style={{ fontSize: 12 }}>Seen {map.lastSeen.toISOString().slice(0, 16).replace("T", " ")}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", width: 58 }}>Battery</span>
+                  <div className="batt-track"><div className="batt-bar" style={{ width: `${battery ?? 0}%`, background: battery != null && battery < 20 ? "var(--crit)" : "var(--ok)" }} /></div>
+                  <span className="mono tnum" style={{ fontWeight: 600, width: 42, textAlign: "right", color: battColor }}>{battery == null ? "—" : `${battery}%`}</span>
+                </div>
+              </>
+            ) : <p className="subtle">No lock mapped.</p>}
+          </div>
+
+          {can("mapping.edit") && (
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: 14 }}>Room → lock mapping</div>
+              <form action={upsertMapping} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <input type="hidden" name="propertyId" value={propertyId} />
+                <input type="hidden" name="roomId" value={roomId} />
+                <div style={{ flex: 1, minWidth: 130 }}><label className="lbl">TTLOCK LOCK ID</label><input name="lockId" placeholder="e.g. 27083179" defaultValue={map ? String(map.lockId) : ""} className="field mono" style={{ width: "100%" }} /></div>
+                <div style={{ flex: 1, minWidth: 110 }}><label className="lbl">ALIAS</label><input name="alias" placeholder="optional" defaultValue={map?.alias ?? ""} className="field" style={{ width: "100%" }} /></div>
+                <button className="btn btn-navy">{map ? "Update" : "Create"}</button>
+              </form>
+              {map && (
+                <form action={async () => { "use server"; await deleteMapping(propertyId, roomId); }} style={{ marginTop: 10 }}>
+                  <button className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}>Remove mapping</button>
+                </form>
+              )}
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: 14 }}>Code history</div>
+            {manual.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                {manual.map((m) => <div key={m.keyboardPwdId} className="subtle" style={{ fontSize: 13, padding: "4px 0" }}><span className="mono">{m.maskedPin}</span> · manual · {m.window}</div>)}
+              </div>
+            )}
+            {history.length === 0 ? <p className="subtle">No past codes.</p> : history.map((h) => (
+              <div key={h.keyboardPwdId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--divider)" }}>
+                <span className="mono" style={{ fontSize: 13 }}>{h.maskedPin}</span>
+                <span className="subtle" style={{ fontSize: 12 }}>{h.type} · {h.status}</span>
+                <div style={{ flex: 1 }} />
+                <span className="subtle mono" style={{ fontSize: 11 }}>{h.reservationId ?? ""}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -230,6 +230,12 @@ a.trow:hover, .trow.clickable:hover { background: var(--row-hover); }
 .batt-track { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .batt-bar { height: 100%; border-radius: 4px; }
 
+.two-col { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.backlink { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 14px; }
+.backlink:hover { color: var(--blue); }
+
 .empty { margin-top: 18px; padding: 28px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); text-align: center; background: var(--surface); }
 
 /* Login responsive: drop the navy panel on small screens. */
