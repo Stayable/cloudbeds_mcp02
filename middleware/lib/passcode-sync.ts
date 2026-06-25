@@ -90,6 +90,20 @@ export async function ensurePasscodes(
   };
 
   for (const roomId of roomIds) {
+    // Reflect occupancy + guest on the room so the lock-app shows guest details
+    // (independent of whether the room is mapped to a lock).
+    const occupancy = {
+      occupancyStatus: "occupied",
+      guestName: detail.guestName ?? null,
+      checkoutDate: detail.endDate ?? payload.endDate ?? null,
+      currentReservationId: reservationId,
+    };
+    await prisma.roomState.upsert({
+      where: { propertyId_roomId: { propertyId, roomId } },
+      create: { propertyId, roomId, ...occupancy },
+      update: occupancy,
+    });
+
     const map = await prisma.lockMap.findUnique({
       where: { propertyId_roomId: { propertyId, roomId } },
     });
@@ -229,6 +243,13 @@ export async function revokePasscodes(
       data: { status: "revoked" },
     });
     result.pinsRevoked++;
+
+    // Guest is leaving — clear occupancy so the room shows vacant in the lock-app.
+    await prisma.roomState.upsert({
+      where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
+      create: { propertyId: pc.propertyId, roomId: pc.roomId, occupancyStatus: "free" },
+      update: { occupancyStatus: "free", guestName: null, checkoutDate: null, currentReservationId: null },
+    });
 
     await prisma.eventLog.create({
       data: {

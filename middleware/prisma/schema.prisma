@@ -38,6 +38,22 @@ model LockMap {
   @@unique([propertyId, roomId])
 }
 
+// Occupancy/guest state shown on the lock-app room pages. Mirrors lock-app's
+// RoomState model (shared Neon table). The middleware writes it on check-in /
+// checkout so guest details fill automatically.
+model RoomState {
+  id                   String   @id @default(cuid())
+  propertyId           String
+  roomId               String
+  occupancyStatus      String   @default("free") // free | reserved | occupied
+  currentReservationId String?
+  guestName            String?
+  checkoutDate         String?
+  updatedAt            DateTime @updatedAt
+
+  @@unique([propertyId, roomId])
+}
+
 model Passcode {
   id            String   @id @default(cuid())
   reservationId String? // nullable: backup/manual codes have no reservation
