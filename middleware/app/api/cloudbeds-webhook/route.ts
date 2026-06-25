@@ -47,19 +47,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Diagnostic: record exactly what Cloudbeds sent (event + raw payload status).
-  await prisma.eventLog
-    .create({
-      data: {
-        source: "webhook",
-        event: payload.event,
-        propertyId: String(payload.propertyID),
-        action: "webhook_received",
-        detail: { reservationId: payload.reservationID, payloadStatus: payload.status ?? null },
-      },
-    })
-    .catch(() => {});
-
   const intent = classifyIntent(payload);
   if (intent === "ignore") {
     // Acknowledge so Cloudbeds stops retrying; record that we saw it.
