@@ -31,18 +31,9 @@ describe("classifyIntent (check-in only)", () => {
 });
 
 describe("reservationNoteBody", () => {
-  it("includes the PIN, room, and validity dates", () => {
-    const body = reservationNoteBody({ pin: "445572", roomName: "239", startDate: "2026-06-25", endDate: "2026-06-26" });
-    expect(body).toContain("445572");
-    expect(body).toContain("239");
-    expect(body).toContain("2026-06-25");
-    expect(body).toContain("2026-06-26");
-  });
-
-  it("works with just the PIN", () => {
-    const body = reservationNoteBody({ pin: "445572" });
-    expect(body).toContain("445572");
-    expect(body.length).toBeGreaterThan(0);
+  it("formats as lockName-PIN", () => {
+    expect(reservationNoteBody({ lockName: "LL-239", pin: "445572" })).toBe("LL-239-445572");
+    expect(reservationNoteBody({ lockName: "KE-105", pin: "1234" })).toBe("KE-105-1234");
   });
 });
 

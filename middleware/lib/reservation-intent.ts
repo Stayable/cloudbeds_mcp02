@@ -52,15 +52,10 @@ export function isPaidInFull(balance: number | string | null | undefined): boole
   return n <= 0;
 }
 
-/** Human-readable note body written onto the Cloudbeds reservation. */
-export function reservationNoteBody(args: {
-  pin: string;
-  roomName?: string;
-  startDate?: string;
-  endDate?: string;
-}): string {
-  const parts = [`Stayable door code: ${args.pin}`];
-  if (args.roomName) parts.push(`Room ${args.roomName}`);
-  if (args.startDate && args.endDate) parts.push(`valid ${args.startDate} → ${args.endDate}`);
-  return parts.join(" · ");
+/**
+ * Note written onto the Cloudbeds reservation: `<lockName>-<PIN>`
+ * (e.g. "LL-239-445572"), matching the devicethread-style token format.
+ */
+export function reservationNoteBody(args: { lockName: string; pin: string }): string {
+  return `${args.lockName}-${args.pin}`;
 }

@@ -193,10 +193,9 @@ export async function ensurePasscodes(
           propertyId,
           reservationId,
           reservationNoteBody({
+            // Lock name (e.g. "LL-239"); fall back to the room if no alias is set.
+            lockName: map.alias?.trim() || roomNameFor(detail, roomId) || roomId,
             pin,
-            roomName: roomNameFor(detail, roomId) ?? roomId,
-            startDate: detail.startDate ?? payload.startDate,
-            endDate: detail.endDate ?? payload.endDate,
           }),
         );
         await prisma.eventLog.create({
