@@ -192,9 +192,24 @@ export interface ReservationDetail {
   guestName?: string;
   balance?: number | string; // amount still owed; 0 (or credit) = paid in full
   // Guest-level check-in state lives here (guestStatus: checked_in / not_checked_in).
-  guestList?: Record<string, { guestStatus?: string; [k: string]: unknown }>;
+  guestList?: Record<string, { guestStatus?: string; roomID?: string; rooms?: ReservationRoom[]; [k: string]: unknown }>;
+  assigned?: ReservationRoom[]; // where getReservation actually lists assigned rooms
   rooms?: ReservationRoom[];
   [key: string]: unknown;
+}
+
+/** Collect every room-like entry across the shapes getReservation may use. */
+function allReservationRooms(detail: ReservationDetail): ReservationRoom[] {
+  const out: ReservationRoom[] = [];
+  if (Array.isArray(detail.assigned)) out.push(...detail.assigned);
+  if (Array.isArray(detail.rooms)) out.push(...detail.rooms);
+  if (detail.guestList && typeof detail.guestList === "object") {
+    for (const g of Object.values(detail.guestList)) {
+      if (g?.roomID) out.push({ roomID: g.roomID });
+      if (Array.isArray(g?.rooms)) out.push(...g.rooms);
+    }
+  }
+  return out;
 }
 
 /**
@@ -220,8 +235,7 @@ export async function getReservation(
  * erroring) rather than a bad PIN.
  */
 export function extractRoomIds(detail: ReservationDetail): string[] {
-  const rooms = Array.isArray(detail.rooms) ? detail.rooms : [];
-  const ids = rooms
+  const ids = allReservationRooms(detail)
     .map((r) => (r?.roomID != null ? String(r.roomID).trim() : ""))
     .filter((id) => id.length > 0);
   return [...new Set(ids)];
@@ -229,8 +243,7 @@ export function extractRoomIds(detail: ReservationDetail): string[] {
 
 /** Human room name (e.g. "239") for a Cloudbeds roomID, if the detail has it. */
 export function roomNameFor(detail: ReservationDetail, roomId: string): string | undefined {
-  const rooms = Array.isArray(detail.rooms) ? detail.rooms : [];
-  const match = rooms.find((r) => String(r?.roomID ?? "").trim() === roomId);
+  const match = allReservationRooms(detail).find((r) => String(r?.roomID ?? "").trim() === roomId);
   return match?.roomName;
 }
 
