@@ -232,4 +232,18 @@ a.trow:hover, .trow.clickable:hover { background: var(--row-hover); }
 
 .empty { margin-top: 18px; padding: 28px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); text-align: center; background: var(--surface); }
 
+/* Login responsive: drop the navy panel on small screens. */
+@media (max-width: 720px) {
+  .login-aside { display: none !important; }
+  .login-form { flex-basis: auto !important; max-width: 100% !important; }
+}
+
+/* Sidebar collapses on narrow screens (content stays usable; full mobile nav TBD). */
+@media (max-width: 860px) {
+  .sidebar { flex-basis: 64px; width: 64px; }
+  .sidebar-brand img, .navitem span, .nav-badge, .sidebar-label, .sidebar-user .nm, .sidebar-user .rl { display: none; }
+  .navitem { justify-content: center; }
+  .content { padding: 20px 16px 40px; }
+}
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

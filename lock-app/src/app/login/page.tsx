@@ -9,9 +9,6 @@ export default function LoginPage() {
   const [stage, setStage] = useState<"email" | "code">("email");
   const [error, setError] = useState("");
 
-  const input = { width: "100%", padding: 10, margin: "8px 0 16px", borderRadius: 6, border: "none", background: "#fff", color: "#041E42" } as const;
-  const button = { width: "100%", padding: 12, background: "#FDDA24", color: "#041E42", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer" } as const;
-
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -23,28 +20,48 @@ export default function LoginPage() {
     setError("");
     const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code }) });
     if (res.ok) router.push("/portfolio");
-    else setError((await res.json().catch(() => ({}))).error ?? "Failed");
+    else setError((await res.json().catch(() => ({}))).error ?? "That code didn't work. Try again.");
   }
 
   return (
-    <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#041E42", color: "#fff", padding: 32, borderRadius: 12, width: 320 }}>
-        <div style={{ color: "#FDDA24", fontWeight: 700, letterSpacing: 1, marginBottom: 16 }}>STAYABLE</div>
-        {stage === "email" ? (
-          <form onSubmit={sendCode}>
-            <label style={{ fontSize: 12 }}>Work email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={input} />
-            <button type="submit" style={button}>Send code</button>
-          </form>
-        ) : (
-          <form onSubmit={verify}>
-            <label style={{ fontSize: 12 }}>6-digit code sent to {email}</label>
-            <input inputMode="numeric" pattern="\d{6}" required value={code} onChange={(e) => setCode(e.target.value)} style={input} />
-            <button type="submit" style={button}>Sign in</button>
-            <button type="button" onClick={() => setStage("email")} style={{ ...button, background: "transparent", color: "#9bb", marginTop: 8, fontWeight: 400 }}>Use a different email</button>
-          </form>
-        )}
-        {error && <p style={{ color: "#FDDA24", fontSize: 13, marginTop: 8 }}>{error}</p>}
+    <main style={{ minHeight: "100vh", display: "flex", background: "var(--navy)", alignItems: "stretch" }}>
+      <div style={{ margin: "auto", width: "100%", maxWidth: 980, display: "flex", borderRadius: 16, overflow: "hidden", boxShadow: "0 40px 100px -30px rgba(0,0,0,.6)" }}>
+        {/* navy panel */}
+        <div className="login-aside" style={{ flex: 1, minWidth: 0, background: "linear-gradient(160deg,#062a5c 0%,#041E42 70%)", padding: "48px 44px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <img src="/brand/stayable-wordmark-white.png" alt="Stayable" style={{ width: 148, display: "block" }} />
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,40px)", gap: 14, marginBottom: 28 }}>
+              <span style={{ width: 40, height: 40, borderRadius: 9, background: "var(--gold)" }} />
+              <span style={{ width: 40, height: 40, borderRadius: 9, background: "rgba(255,255,255,.10)" }} />
+              <span style={{ width: 40, height: 40, borderRadius: 9, background: "rgba(255,255,255,.10)" }} />
+              <span style={{ width: 40, height: 40, borderRadius: 9, background: "var(--blue)" }} />
+            </div>
+            <div className="display" style={{ color: "#fff", fontSize: 30, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-.01em", maxWidth: 320 }}>Access control for every door you manage.</div>
+            <div style={{ color: "var(--on-navy)", fontSize: 15, lineHeight: 1.5, marginTop: 14, maxWidth: 340 }}>8 properties. Every lock, code, and check-in — in one place.</div>
+          </div>
+          <div className="mono" style={{ color: "var(--on-navy-label)", fontSize: 11, fontWeight: 500, letterSpacing: ".05em" }}>RISE8 · STAYABLE OPS</div>
+        </div>
+        {/* form panel */}
+        <div style={{ flex: "0 0 380px", maxWidth: "48%", background: "#fff", padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center" }} className="login-form">
+          <div className="display" style={{ fontSize: 22, fontWeight: 600, color: "var(--ink)" }}>Sign in</div>
+          {stage === "email" ? (
+            <form onSubmit={sendCode}>
+              <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>We&apos;ll email you a one-time code.</p>
+              <label className="lbl" style={{ margin: "26px 0 8px" }}>WORK EMAIL</label>
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="field" style={{ width: "100%", height: 46 }} placeholder="you@rentstayable.com" />
+              <button type="submit" className="btn btn-primary" style={{ marginTop: 14, width: "100%", height: 46 }}>Send code</button>
+            </form>
+          ) : (
+            <form onSubmit={verify}>
+              <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>Enter the 6-digit code sent to {email}.</p>
+              <label className="lbl" style={{ margin: "26px 0 8px" }}>6-DIGIT CODE</label>
+              <input inputMode="numeric" pattern="\d{6}" required value={code} onChange={(e) => setCode(e.target.value)} className="field mono" style={{ width: "100%", height: 52, fontSize: 22, letterSpacing: ".3em", textAlign: "center" }} />
+              <button type="submit" className="btn btn-navy" style={{ marginTop: 16, width: "100%", height: 46 }}>Verify &amp; continue</button>
+              <button type="button" onClick={() => setStage("email")} className="btn btn-ghost" style={{ marginTop: 8, width: "100%", height: 42, border: "none" }}>Use a different email</button>
+            </form>
+          )}
+          {error && <p style={{ color: "var(--crit-ink)", fontSize: 13, marginTop: 12 }}>{error}</p>}
+        </div>
       </div>
     </main>
   );
