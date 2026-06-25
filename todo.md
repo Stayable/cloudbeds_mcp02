@@ -5,7 +5,72 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
-RESUME HERE (2026-06-23): **Property-first restructure COMPLETE** (8-task plan,
+RESUME HERE (2026-06-25 LATE) — **Lakeland check-in trial fully wired; BLOCKED on a Neon
+DB mismatch (fix first, ~5 min).** This session shipped a LOT (18 commits, all to prod):
+• **Full lock-app visual redesign** ported from the Claude-design mockup
+  (`lock-app/Stayable Lock App/`): new `globals.css` design system (navy/blue #1E8FF2/gold,
+  dark shell), Space Grotesk + IBM Plex Sans/Mono via next/font, brand assets in
+  `public/brand`, persistent global sidebar + restyled topbar, and ALL screens ported
+  (split-screen login, portfolio "fleet heartbeat" cards, dashboard, rooms, room detail
+  w/ navy PIN block, devices, unassigned, activity, alerts). 87 tests pass. Deployed prod
+  (lock-app-dusky). DEMO DATA cleared from Neon + demo-strip removed.
+• **Lock auto-onboarding** (spec `docs/superpowers/specs/2026-06-25-lock-auto-onboarding-design.md`):
+  discovery sync + `<ABBR>-<room>` naming (KE/KW/OR/LL/JN/JW/SA/DV on PROPERTIES.abbr) +
+  Unassigned queue + assign=rename-in-TTLock+map; assign room# auto-prefilled from lock name.
+• **Middleware on check-in** now: creates PIN + posts reservation note **`LL-239-<PIN>`** +
+  writes RoomState (occupancy/guest, clears on checkout) + **gates on paid-in-full
+  (balance 0)**; trigger = **check-in only**. Pure logic in `lib/reservation-intent.ts`
+  (classifyIntent/reservationNoteBody/isPaidInFull, vitest). Deployed prod.
+• Trial set up: lock **27083179** mapped to Lakeland(**210972**)/roomId **405761-25** alias
+  **LL-239**; lock renamed in TTLock; **2 webhooks registered** (status_changed + deleted on
+  210972 → lock-middleware.vercel.app/api/cloudbeds-webhook?token=<secret>); reservation
+  **3435425699816** balance zeroed ($0). Gerardo also has a manual permanent code on the lock
+  ("contractors" 9735) — our codes are additive, never overwrite his.
+**BLOCKER (do FIRST):** test check-in (status→in-house) fired the webhook (HTTP 200) but
+wrote ZERO rows to lock-app's Neon → **lock-middleware prod `DATABASE_URL` ≠ lock-app's**
+(Vercel provisions a separate Neon per project). FIX: copy `DATABASE_URL` +
+`DATABASE_URL_UNPOOLED` from the **lock-app** Vercel project into **lock-middleware** (host
+must be `ep-nameless-sound-atep4iwp…neon.tech`), redeploy middleware. THEN revert res to
+confirmed → set in-house again → read shared eventLog (via lock-app/.env scripts) → likely
+Cloudbeds sends status **`in_house` NOT `checked_in`** → update ACTIVE_STATUSES in
+`middleware/lib/reservation-intent.ts` + redeploy. (Memory: lock-trial-blocker-db-mismatch.)
+LOOSE ENDS: rotate Lakeland `cbat_` key + `WEBHOOK_SECRET` (both pasted in chat); delete
+`register-webhooks-lakeland.ps1` + untracked one-off scripts `lock-app/prisma/{add-trial-lock,
+unmap-trial-lock,map-lakeland-trial,check-trial-state,all-events,clear-demo-data}.ts`;
+`lock-app/Stayable Lock App/` + `.zip` mockup are untracked (assets already copied to
+public/brand — safe to delete); root `.vercel/` is an untracked link to lock-middleware.
+Cloudbeds MCP `.env` key was swapped → /mcp reconnect picks it up (done this session).
+--- earlier 2026-06-25 ---
+PRIOR (2026-06-25): **4 login accounts added + redeployed** (earlier this session).
+Added `prisma/seed-users.ts` + `npm run db:seed:users` → upserts rb@rise8companies.com,
+admin@rentstayable.com, bke@rentstayable.com, kate@rentstayable.com as **super_admin / all**
+(OTP only mints for emails in the User table, so a row = login access). Ran against prod
+Neon; committed a269fc6; redeployed lock-app to prod (Ready, dpl …lock-bf9qyuaf1).
+OPEN: 3 placeholder display names (Rob/Admin/Kate) — get real names, re-run seed (no
+redeploy needed). NOTE: Vercel CLI deploy worked from sandbox this session (the documented
+api.vercel.com block didn't bite). Earlier 2026-06-25 work below:
+PRIOR (2026-06-25): **OTP email + portfolio redesign + demo data shipped.**
+This session: (1) **OTP login now emails the code via Resend** — `lib/email.ts`
+(`buildOtpEmail` pure + Stayable-branded, `sendOtpEmail` via Resend REST API, no
+SMTP/SDK dep); `createOtp` emails + falls back to console log on failure; 5 new
+tests (70/70 pass). Prod env set: `RESEND_API_KEY` (user-added) + `EMAIL_FROM`=
+`Stayable Locks <hr@rise8companies.com>`. **Sender domain rise8companies.com must
+be DNS-verified in Resend or sends fail** — confirm live (send a code to
+bke@rise8companies.com, check inbox vs runtime logs). (2) **Portfolio redesigned**:
+`globals.css` got a full design system (canvas bg, type scale restored after
+Tailwind preflight, eyebrows, tabular-nums, status rails) — lifts EVERY page off
+raw HTML; portfolio is now a **4-col wrapping card grid** (4/3/2/1 responsive) of
+property status panels (left rail green/red by health, gold hover hairline).
+(3) **Demo data across all 8 properties**: `seed-dev.ts` rewritten — 101 test
+locks (Lakeland/KissimmeeEast keep hand-crafted lock-388 door-detail demo; other
+6 generated), seeded into shared Neon. App-wide **DEMO DATA strip** under the top
+bar (placeholders until live TTLock locks register). Deployed to prod 3×
+(latest dpl_…c1get26xd). 3 commits: bc6e3b6, b286080, 314b4fd.
+NEXT: carry the new styling into dashboard/rooms/devices/activity pages (they have
+data now but still use sparse inline styles); verify Resend domain + live OTP email;
+then Plan 4 (alerts engine) or Plan 5 remainder.
+---
+PRIOR (2026-06-23): **Property-first restructure COMPLETE** (8-task plan,
 `docs/superpowers/plans/2026-06-23-lock-app-property-first-restructure.md`). Shipped:
 email-**OTP** login (6-digit code, replaces magic-link; code logged to console till
 email delivery ships), **Portfolio** picker landing (`/portfolio`) → per-property
@@ -17,6 +82,11 @@ delivery deferred to Alerts engine). Login white-on-white input bug fixed. 3 new
 libs TDD (otp/dashboard/notifications); **65/65 tests pass**, typecheck+build green.
 Smoke-tested live: OTP login → portfolio → dashboard renders seeded actions. Removed
 unused PropertySwitcher. 9 commits this session.
+REFERENCE (2026-06-23): `lock-app/DeviceThread/` = 6 PNG screenshots of the legacy
+DeviceThread/SmartAccess UI (the system we're replacing), kept as design source of truth:
+Dashboard(+Sidebar), Alert, Reports, SmartAccess_AccessSchedule, SmartAccess_Guests.
+Alert.png → maps to Plan 4 (alerts engine); SmartAccess_Guests → guest code surfaces.
+Currently UNTRACKED — decide whether to commit (e.g. lock-app/docs/legacy-ui/) or leave.
 NEXT SESSION — pick one: (1) **Plan 4** = alerts engine + crons (turns the bell real:
 detection jobs + email delivery + notification-pref enforcement); (2) **create the
 lock-app Vercel project** (Root Dir `lock-app/`, shared Neon `DATABASE_URL`) to deploy;
@@ -51,8 +121,9 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
 - [~] 🟡 Connect the one Neon DB to both projects (shared `DATABASE_URL`)
       lock-app: DATABASE_URL + DATABASE_URL_UNPOOLED + JWT_SECRET set (Production). DB
       connectivity verified live (auth/request → 200). Preview-env vars NOT set yet.
-      OPEN: prod login needs the OTP code from Vercel runtime logs until email is wired
-      (Plan 4/5); CLI deploy is NOT Git-connected (no auto-deploy on push) — wire Git
+      OTP EMAIL NOW WIRED (2026-06-25, Resend) — login no longer needs the runtime
+      logs once rise8companies.com is verified in Resend. CLI deploy is NOT
+      Git-connected (no auto-deploy on push) — wire Git
       integration + Root Dir `lock-app/` in the dashboard if auto-deploys are wanted.
 
 ### Phase 2 — middleware: TTLock auth (validates creds) ⭐
@@ -113,6 +184,17 @@ Legend: 🟢 ready now · 🟡 needs an input · 🔴 blocked on Gerardo/on-site
       reconcile, LockMap CRUD; all permission-gated + audit-logged. Pure libs TDD
       (passcodes/reconcile/audit/door-detail). TTLock client ported. typecheck/build/tests
       green. LIVE-UNVERIFIED: needs a registered lock + reachable euapi.ttlock.com.
+- [x] 🟢 Real OTP email (2026-06-25) — `lib/email.ts` via Resend; `createOtp` emails
+      the code (fallback to console log). Prod env: RESEND_API_KEY + EMAIL_FROM set.
+      OPEN: confirm rise8companies.com is DNS-verified in Resend (else sends fail).
+- [x] 🟢 Portfolio visual redesign + app-wide base styles (2026-06-25) — 4-col card
+      grid, design system in globals.css. TODO: same treatment for dashboard/rooms/
+      devices/activity (still sparse inline styles).
+- [x] 🟢 Demo data for all 8 properties (2026-06-25) — seed-dev.ts → 101 test locks
+      in Neon; app-wide DEMO DATA strip. Re-run `npm run db:seed:dev` to reset.
+- [x] 🟢 Login accounts (2026-06-25) — `seed-users.ts` + `db:seed:users` upserts 4
+      super_admin/all users into prod Neon (rb@rise8companies, admin/bke/kate@rentstayable).
+      OPEN: replace placeholder names (Rob/Admin/Kate) once real names known.
 - [ ] 🟢 Field (mobile): room lookup → current PIN, mark lock registered
 
 ### Phase 6 — Cloudbeds webhook registration
