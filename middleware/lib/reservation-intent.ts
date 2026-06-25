@@ -39,6 +39,19 @@ export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "
   return "ignore";
 }
 
+/**
+ * Whether a reservation is fully paid (balance owed is zero or a credit).
+ * RISE8 rule: a guest door code is created only when checked-in AND paid in full.
+ * Fails closed — an unknown/unparseable balance is treated as NOT paid, so we
+ * never mint a code for a reservation whose balance we can't confirm is settled.
+ */
+export function isPaidInFull(balance: number | string | null | undefined): boolean {
+  if (balance === null || balance === undefined || balance === "") return false;
+  const n = typeof balance === "number" ? balance : Number(balance);
+  if (Number.isNaN(n)) return false;
+  return n <= 0;
+}
+
 /** Human-readable note body written onto the Cloudbeds reservation. */
 export function reservationNoteBody(args: {
   pin: string;

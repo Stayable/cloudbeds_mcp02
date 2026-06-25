@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyIntent, reservationNoteBody } from "./reservation-intent";
+import { classifyIntent, reservationNoteBody, isPaidInFull } from "./reservation-intent";
 
 describe("classifyIntent (check-in only)", () => {
   it("creates a code when the guest checks in", () => {
@@ -43,5 +43,26 @@ describe("reservationNoteBody", () => {
     const body = reservationNoteBody({ pin: "445572" });
     expect(body).toContain("445572");
     expect(body.length).toBeGreaterThan(0);
+  });
+});
+
+describe("isPaidInFull", () => {
+  it("is true when balance is zero", () => {
+    expect(isPaidInFull(0)).toBe(true);
+    expect(isPaidInFull("0")).toBe(true);
+    expect(isPaidInFull("0.00")).toBe(true);
+  });
+  it("is true when overpaid (credit balance)", () => {
+    expect(isPaidInFull(-5)).toBe(true);
+  });
+  it("is false when a balance remains", () => {
+    expect(isPaidInFull(180.5)).toBe(false);
+    expect(isPaidInFull("180.50")).toBe(false);
+  });
+  it("is false when balance is unknown (fail closed — no code until confirmed paid)", () => {
+    expect(isPaidInFull(null)).toBe(false);
+    expect(isPaidInFull(undefined)).toBe(false);
+    expect(isPaidInFull("")).toBe(false);
+    expect(isPaidInFull("abc")).toBe(false);
   });
 });

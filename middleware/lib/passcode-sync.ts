@@ -21,6 +21,7 @@ import { createPasscode, deletePasscode } from "./ttlock";
 import {
   classifyIntent,
   reservationNoteBody,
+  isPaidInFull,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
@@ -75,6 +76,8 @@ export async function ensurePasscodes(
 
   const detail = await getReservation(registry, propertyId, reservationId);
   const roomIds = extractRoomIds(detail);
+  // RISE8 rule: a code is only created when checked-in AND paid in full.
+  const paidInFull = isPaidInFull(detail.balance);
   // Prefer the precise dates from the reservation detail; fall back to payload.
   const { startTs, endTs } = validityWindow(
     detail.startDate ?? payload.startDate,
@@ -103,6 +106,22 @@ export async function ensurePasscodes(
       create: { propertyId, roomId, ...occupancy },
       update: occupancy,
     });
+
+    // Payment gate: checked-in but a balance remains → no code yet. Logged so a
+    // later event (once paid) can re-run and mint it (idempotent).
+    if (!paidInFull) {
+      await prisma.eventLog.create({
+        data: {
+          source: "webhook",
+          event: payload.event,
+          propertyId,
+          roomId,
+          action: "awaiting_payment",
+          detail: { reservationId, balance: detail.balance ?? null },
+        },
+      });
+      continue;
+    }
 
     const map = await prisma.lockMap.findUnique({
       where: { propertyId_roomId: { propertyId, roomId } },

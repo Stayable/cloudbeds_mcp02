@@ -190,6 +190,7 @@ export interface ReservationDetail {
   startDate?: string;
   endDate?: string;
   guestName?: string;
+  balance?: number | string; // amount still owed; 0 (or credit) = paid in full
   rooms?: ReservationRoom[];
   [key: string]: unknown;
 }
