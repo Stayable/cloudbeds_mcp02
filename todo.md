@@ -5,6 +5,26 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
+RESUME HERE (2026-06-25 FINAL) — ✅ **Lakeland check-in flow WORKS end-to-end (verified live).**
+Check-in (in-house) + balance 0 → middleware created guest PIN **794490** on lock 27083179 +
+posted reservation note **`LL-239-794490`** + set room 239 occupied. The "DB mismatch" was a
+FALSE ALARM (one shared Neon all along). Real root-cause bug fixed: **extractRoomIds** now reads
+`assigned[]`/`guestList[].rooms[]`, not just top-level `rooms[]` (which was always empty → no PIN).
+Also: check-in detected from webhook payload `status:checked_in` (+ fetched status/guestStatus
+fallback + read-retry for webhook lag); payment gate (balance 0). Diagnostics removed; throwaway
+scripts + register-webhooks ps1 (had secrets) deleted. Gerardo to test checkout→revoke. Note
+author shows BK's account (Cloudbeds stamps the key owner; no author param) — TEMPORARY, OK.
+**TOMORROW (per BK):**
+1. ⭐ **REMINDER BK ASKED FOR:** build **room-name → Cloudbeds roomID resolution** in the
+   Unassigned-queue *assign* — it currently maps `roomId` = the typed room ("239"), but check-in
+   matches the Cloudbeds roomID ("405761-25"). Until resolved, onboarding-assigned locks won't
+   drive check-in PINs. Onboarding↔check-in consistency fix.
+2. **Rotate** Lakeland `cbat_` key + `WEBHOOK_SECRET` (both pasted in chat) → re-register the 2 webhooks.
+3. **Roll out the other 7 properties:** per-property `cbat_` key (Reservations read+write) + register
+   `status_changed` + `deleted` webhooks → same `/api/cloudbeds-webhook?token=<WEBHOOK_SECRET>`.
+Branch many commits ahead of origin, NOT pushed. Team updated on progress.
+SERVICE ACCOUNT (deferred): dedicated Cloudbeds user "Stayable Lock App" so notes aren't BK's.
+--- prior (now-resolved) detail below ---
 RESUME HERE (2026-06-25 LATE) — **Lakeland check-in trial fully wired; BLOCKED on a Neon
 DB mismatch (fix first, ~5 min).** This session shipped a LOT (18 commits, all to prod):
 • **Full lock-app visual redesign** ported from the Claude-design mockup
