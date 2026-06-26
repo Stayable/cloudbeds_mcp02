@@ -173,6 +173,33 @@ self-heal, and needs separate handling for `accommodation_removed`.
 4. **Revoke path unchanged.** Checkout / cancel / delete still revoke *all*
    active PINs for the reservation via `revokePasscodes`.
 
+## Reservation code surface: replace, not append (added 2026-06-27 per BK)
+
+When a room changes **or** a code is regenerated, the reservation must show only
+the **current** code — the stale `LL-<oldRoom>-<oldPIN>` must not linger alongside
+the new one. The current create path uses `postReservationNote`, which **appends**
+(Cloudbeds has no documented note edit/delete in PMS v1.2), so repeated events
+would pile up stale codes.
+
+Requirement: the code surface is **replaced**, not appended, on every change
+(room change, regeneration, and ideally checkout-clear).
+
+OPEN QUESTION (resolve when building — do not assume): how to achieve replace
+given append-only notes. Candidate approaches, to verify against live Cloudbeds:
+1. **Reservation custom field** (preferred if available) — write the current code
+   to a dedicated field (e.g. "Door Code") that is overwritten each time. The
+   `reservation/custom_fields_changed` webhook implies custom fields are
+   updatable; confirm the exact write endpoint (`putReservation`/custom-field
+   POST). Notes may still get a one-line audit append, but the authoritative
+   current code lives in the overwritable field.
+2. **Notes rewrite** — only if a set/overwrite-notes capability exists; read
+   current notes, strip the old `LL-…-…` token, write back with the new one.
+   Likely NOT supported (append-only) — verify before relying on it.
+
+Until resolved, the reconcile/regenerate paths must at minimum **not** leave two
+active code tokens visible; if only append is possible, post a clear superseding
+note (e.g. `LL-<newRoom>-<newPIN> (replaces LL-<oldRoom>-<oldPIN>)`).
+
 ## Design decisions
 
 - **Fresh PIN on the new room** — the guest does not keep their old digits. The
