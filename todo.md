@@ -5,6 +5,33 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
+RESUME HERE (2026-06-27) — **Resolver SHIPPED + checkout→revoke verified live; 2 locks mapped at Lakeland.**
+This session:
+• ✅ **Full check-in cycle PROVEN LIVE** (event log): passcode_created → reservation_note_posted →
+  code_revealed → **passcode_revoked on checkout** (res 3435425699816). The "untested checkout→revoke"
+  item is DONE. Webhook is actively receiving real Lakeland check-ins (3 real guests hit no_lock_mapped).
+• ✅ **Room-name → Cloudbeds-roomID RESOLVER built** (commit 1365b16): `lock-app/src/lib/room-resolver.ts`
+  (pure index + RoomIndexCache, 5 tests) + `cloudbeds.ts` (read-only client/registry + listRooms).
+  Sync + unassigned-assign now resolve room#→Cloudbeds roomID; **Sync no longer clobbers** good maps
+  (refuses to overwrite when unresolved). Assign errors loudly if no key / unknown room. Added
+  `LockMap.roomName` (pushed to Neon); dashboard actions show room NUMBER not roomID. 96/96 tests, build green.
+• ✅ Discovered roomID format = `<roomTypeID>-<seq>` (Lakeland: 405758=Double,405759=King,405761=DblStudio,
+  405763=KingStudio,405768=Single); room# lives in roomName, NOT derivable — must list_rooms.
+• ✅ **Two locks mapped at Lakeland** (hand-corrected this session): lock 27083179→405761-25 (Room 239),
+  lock 25039233 "test -not installed"→405758-102 (Room 292). Both have roomName backfilled.
+• ✅ Gerardo login added (super_admin); `users.view` permission (admin manages, others view).
+• ✅ Fixed lock-app Vercel missing TTLOCK_* env (Sync button now works); root cause of redeploy-not-applying
+  = dashboard redeploy clones old env snapshot → must `vercel --prod` fresh from lock-app/.
+• ✅ Specs: room-change reconciliation (Approach B, accommodation_changed→revoke old+create new) + full
+  baseline flow + **note must be REPLACED not appended** on room-change/regen (open Q: custom field vs notes).
+• ✅ Design brief `claude-design-guest-code-notification.md` (guest "door code ready" email/SMS template).
+TO MAKE RESOLVER LIVE (next): (1) `vercel --prod` from lock-app/ to deploy resolver+display; (2) add
+**CLOUDBEDS_API_KEY_<id> (read scope)** to the lock-app Vercel project (it has NONE; middleware has them).
+Without keys Sync reports "unresolved" but is now SAFE (won't clobber).
+READY TO TEST NOW: #1 check-in→code on Room 239 or 292 (runs via middleware, mappings correct).
+NOT BUILT: #2 room change (needs room-change reconciliation built); guest-code delivery (template only,
+sending not wired); gateway-status feature (designed, not built); Plan 4 sync cron (deferred, manual button OK).
+--- prior ---
 RESUME HERE (2026-06-25 FINAL) — ✅ **Lakeland check-in flow WORKS end-to-end (verified live).**
 Check-in (in-house) + balance 0 → middleware created guest PIN **794490** on lock 27083179 +
 posted reservation note **`LL-239-794490`** + set room 239 occupied. The "DB mismatch" was a
