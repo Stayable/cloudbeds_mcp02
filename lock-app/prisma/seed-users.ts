@@ -15,6 +15,7 @@ const USERS: [string, string, string][] = [
   ["admin@rentstayable.com", "Admin", "super_admin"],
   ["bke@rentstayable.com", "BK Estocapio", "super_admin"],
   ["kate@rentstayable.com", "Kate", "super_admin"],
+  ["gerardo@rentstayable.com", "Gerardo", "super_admin"],
 ];
 
 async function main() {

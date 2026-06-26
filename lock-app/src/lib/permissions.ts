@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   "mapping.edit",
   "activity.view",
   "activity.export",
+  "users.view",
   "users.manage",
   "roles.manage",
   "settings.manage",

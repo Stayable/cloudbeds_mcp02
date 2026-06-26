@@ -14,8 +14,11 @@ const ATTENDANT = [
   "lock.sync",
   "devices.view",
   "activity.view",
+  "users.view",
 ];
 
+// Manager gets everything except the two admin-only powers: managing roles and
+// managing users. Manager can VIEW users (users.view) but not create/edit them.
 const MANAGER = PERMISSIONS.filter((p) => p !== "roles.manage" && p !== "users.manage");
 
 async function main() {

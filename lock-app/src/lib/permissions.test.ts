@@ -29,4 +29,18 @@ describe("hasPermission", () => {
   it("ignores scope when no property is supplied (global view)", () => {
     expect(hasPermission(attendant, "rooms.view")).toBe(true);
   });
+
+  it("splits user management: admin manages, others only view", () => {
+    // super_admin (all permissions) can manage users.
+    expect(hasPermission(superAdmin, "users.manage")).toBe(true);
+    expect(hasPermission(superAdmin, "users.view")).toBe(true);
+    // A non-admin holding only users.view can view but not manage.
+    const viewer: ActorPermissions = {
+      permissions: ["users.view"],
+      scopeType: "all",
+      propertyIds: [],
+    };
+    expect(hasPermission(viewer, "users.view")).toBe(true);
+    expect(hasPermission(viewer, "users.manage")).toBe(false);
+  });
 });
