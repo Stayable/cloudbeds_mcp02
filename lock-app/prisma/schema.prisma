@@ -13,7 +13,8 @@ datasource db {
 model LockMap {
   id         String   @id @default(cuid())
   propertyId String
-  roomId     String
+  roomId     String // Cloudbeds roomID (e.g. "405758-102"), resolved at onboarding
+  roomName   String? // human room number (e.g. "292"), for display
   lockId     BigInt
   alias      String?
   // lock health (lock-app additions; polled by Plan 4 cron)

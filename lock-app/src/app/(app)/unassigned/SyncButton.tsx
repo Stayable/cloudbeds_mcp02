@@ -25,6 +25,7 @@ export default function SyncButton() {
         <span style={{ color: "#041E42" }}>
           {state.summary.total} locks · mapped {state.summary.mapped} ·
           queued {state.summary.queued} · kept {state.summary.kept}
+          {state.summary.unresolved > 0 && ` · ${state.summary.unresolved} unresolved`}
           {state.summary.errors.length > 0 && ` · ${state.summary.errors.length} errors`}
         </span>
       )}

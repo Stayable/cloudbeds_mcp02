@@ -16,17 +16,22 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [locks, states, guestPins, doorEvents] = await Promise.all([
-    prisma.lockMap.findMany({ where: { propertyId }, select: { roomId: true, online: true, battery: true } }),
+    prisma.lockMap.findMany({ where: { propertyId }, select: { roomId: true, roomName: true, online: true, battery: true } }),
     prisma.roomState.findMany({ where: { propertyId }, select: { roomId: true, occupancyStatus: true } }),
     prisma.passcode.findMany({ where: { propertyId, status: "active", type: "guest" }, select: { roomId: true } }),
     prisma.eventLog.findMany({ where: { propertyId, action: "door_left_open", createdAt: { gt: since } }, select: { roomId: true } }),
   ]);
+
+  // Cloudbeds roomID → human room number, for friendly action labels.
+  const roomNameById: Record<string, string> = {};
+  for (const l of locks) if (l.roomName) roomNameById[l.roomId] = l.roomName;
 
   const { kpis, actions } = buildDashboard({
     locks: locks.map((l) => ({ roomId: l.roomId, online: l.online, battery: l.battery })),
     states: states.map((s) => ({ roomId: s.roomId, occupancyStatus: s.occupancyStatus as Occupancy })),
     activeGuestRoomIds: guestPins.map((p) => p.roomId),
     doorOpenRoomIds: doorEvents.map((e) => e.roomId).filter((r): r is string => !!r),
+    roomNameById,
   });
 
   const rooms = kpis.occupied + kpis.vacant;

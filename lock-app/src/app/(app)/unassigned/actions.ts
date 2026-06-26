@@ -6,6 +6,8 @@ import { requirePermission } from "@/lib/rbac";
 import { syncDiscoveredLocks, type SyncSummary } from "@/lib/lock-sync";
 import { canonicalLockName } from "@/lib/lock-naming";
 import { renameLock } from "@/lib/ttlock";
+import { CloudbedsRegistry } from "@/lib/cloudbeds";
+import { loadRoomIndex, resolveFromIndex } from "@/lib/room-resolver";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
 
@@ -25,7 +27,7 @@ export async function runLockSync(_prev: SyncState, _formData: FormData): Promis
       propertyId: "all",
       detail: buildDetail({
         outcome: summary.errors.length ? "warning" : "success",
-        message: `mapped ${summary.mapped}, queued ${summary.queued}, kept ${summary.kept} of ${summary.total}`,
+        message: `mapped ${summary.mapped}, queued ${summary.queued}, kept ${summary.kept}, unresolved ${summary.unresolved} of ${summary.total}`,
         extra: { errors: summary.errors },
       }),
     });
@@ -55,26 +57,42 @@ export async function assignUnassignedLock(formData: FormData): Promise<void> {
   const user = await requirePermission("mapping.edit", propertyId);
   const lockId = BigInt(lockIdRaw);
 
+  // Resolve the typed room NUMBER to the Cloudbeds roomID the check-in webhook
+  // matches on. Do this BEFORE renaming/mapping so a bad room number fails loudly
+  // instead of creating a mapping that silently never drives a PIN.
+  const index = await loadRoomIndex(CloudbedsRegistry.fromEnv(), propertyId);
+  if (!index) {
+    throw new Error(
+      `No Cloudbeds key configured for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} to the lock-app so room numbers can be resolved.`,
+    );
+  }
+  const roomId = resolveFromIndex(index, room);
+  if (!roomId) {
+    throw new Error(
+      `Room "${room}" was not found in Cloudbeds for this property (or the number is ambiguous). Check the room number.`,
+    );
+  }
+
   // Rename in TTLock first — if this fails (e.g. gateway/lock unreachable) we
   // surface the error and leave the queue untouched rather than mapping a lock
   // whose real name doesn't match.
   await renameLock(lockId, name);
 
   await prisma.lockMap.upsert({
-    where: { propertyId_roomId: { propertyId, roomId: room } },
-    create: { propertyId, roomId: room, lockId, alias: name },
-    update: { lockId, alias: name },
+    where: { propertyId_roomId: { propertyId, roomId } },
+    create: { propertyId, roomId, roomName: room, lockId, alias: name },
+    update: { lockId, roomName: room, alias: name },
   });
   // One mapping per lock: drop any other rows for this lockId, clear the queue.
-  await prisma.lockMap.deleteMany({ where: { lockId, NOT: { propertyId, roomId: room } } });
+  await prisma.lockMap.deleteMany({ where: { lockId, NOT: { propertyId, roomId } } });
   await prisma.unassignedLock.deleteMany({ where: { lockId } });
 
   await writeAudit(user, {
     action: "unassigned_lock_assigned",
     propertyId,
-    roomId: room,
+    roomId,
     lockId,
-    detail: buildDetail({ message: `assigned + renamed to ${name}`, extra: { lockId: lockIdRaw, name } }),
+    detail: buildDetail({ message: `assigned + renamed to ${name} (room ${room} → ${roomId})`, extra: { lockId: lockIdRaw, name, room, roomId } }),
   });
   revalidatePath("/unassigned");
 }

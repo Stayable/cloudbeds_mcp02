@@ -23,20 +23,24 @@ export interface DashAction {
 export interface DashboardInput {
   locks: LockRow[]; states: StateRow[];
   activeGuestRoomIds: string[]; doorOpenRoomIds: string[];
+  /** Cloudbeds roomID → human room number, for friendly labels. Optional. */
+  roomNameById?: Record<string, string>;
 }
 export interface Dashboard { kpis: DashKpis; actions: DashAction[]; }
 
 export function buildDashboard(input: DashboardInput): Dashboard {
-  const { locks, states, activeGuestRoomIds, doorOpenRoomIds } = input;
+  const { locks, states, activeGuestRoomIds, doorOpenRoomIds, roomNameById } = input;
   const hasGuestCode = new Set(activeGuestRoomIds);
   const occByRoom = new Map(states.map((s) => [s.roomId, s.occupancyStatus]));
+  // Prefer the human room number in labels; fall back to the raw roomId.
+  const nameOf = (roomId: string) => roomNameById?.[roomId] ?? roomId;
 
   let online = 0, offline = 0, lowBattery = 0;
   const actions: DashAction[] = [];
   for (const l of locks) {
     const low = l.battery != null && l.battery < LOW_BATTERY_PCT;
-    if (l.online) online++; else { offline++; actions.push({ kind: "offline", roomId: l.roomId, label: `Lock offline in room ${l.roomId}`, severity: "critical" }); }
-    if (low) { lowBattery++; actions.push({ kind: "low_battery", roomId: l.roomId, label: `Low battery (${l.battery}%) in room ${l.roomId}`, severity: "warning" }); }
+    if (l.online) online++; else { offline++; actions.push({ kind: "offline", roomId: l.roomId, label: `Lock offline in room ${nameOf(l.roomId)}`, severity: "critical" }); }
+    if (low) { lowBattery++; actions.push({ kind: "low_battery", roomId: l.roomId, label: `Low battery (${l.battery}%) in room ${nameOf(l.roomId)}`, severity: "warning" }); }
   }
 
   let occupied = 0;
@@ -44,11 +48,11 @@ export function buildDashboard(input: DashboardInput): Dashboard {
 
   for (const [roomId, occ] of occByRoom) {
     if ((occ === "occupied" || occ === "reserved") && !hasGuestCode.has(roomId)) {
-      actions.push({ kind: "no_guest_code", roomId, label: `No active guest code in room ${roomId}`, severity: "warning" });
+      actions.push({ kind: "no_guest_code", roomId, label: `No active guest code in room ${nameOf(roomId)}`, severity: "warning" });
     }
   }
   for (const roomId of doorOpenRoomIds) {
-    actions.push({ kind: "door_left_open", roomId, label: `Door left open in room ${roomId}`, severity: "critical" });
+    actions.push({ kind: "door_left_open", roomId, label: `Door left open in room ${nameOf(roomId)}`, severity: "critical" });
   }
 
   return {
