@@ -36,6 +36,92 @@ Root cause is two-fold:
   `status_changed` uses `reservationID` / `propertyID`. The payload parser must
   accept **both casings**.
 
+## Current flow (unchanged baseline)
+
+This is the system as it exists today, restated so this spec stands on its own.
+The room-change work *adds* to it; none of the paths below change. Full original
+design: `2026-06-12-ttlock-cloudbeds-middleware-design.md`.
+
+### Webhook receiver — `POST /api/cloudbeds-webhook?token=<WEBHOOK_SECRET>`
+
+One endpoint, registered in all 8 Cloudbeds accounts. Steps:
+
+1. **Auth.** Verify the secret URL token (constant-time). Bad/missing → `401`.
+   (Cloudbeds does not sign webhooks, so the token is the only gate.)
+2. **Parse.** Malformed JSON → `400`. Missing `event` / `propertyID` /
+   `reservationID` → `400`. Neither is retryable.
+3. **Classify** via `classifyIntent` (below).
+4. **Act.** `ensure` → `ensurePasscodes`; `revoke` → `revokePasscodes`;
+   `ignore` → log `ignored`, return `200`.
+5. **Response contract.** Return `2XX` on anything handled or non-retryable;
+   return `500` only on a transient failure (Cloudbeds/TTLock/DB hiccup) so
+   Cloudbeds retries (it retries 5× at 1-min intervals). All work is idempotent,
+   so a retry is safe.
+
+### `classifyIntent(payload)` → `ensure | revoke | ignore`
+
+- event name includes `deleted` → **revoke**
+- `status` ∈ {`canceled`, `cancelled`, `checked_out`, `no_show`} → **revoke**
+- event name includes `status_changed` → **ensure**
+- everything else (e.g. `created`) → **ignore** (do nothing until a status change)
+
+The thin `status_changed` payload's top-level `status` stays `confirmed` even on
+check-in (check-in is tracked per-guest), so we can't decide create-vs-not from
+the payload — every `status_changed` routes to `ensure`, which re-fetches the
+reservation and applies the real gate.
+
+### Create path — `ensurePasscodes(registry, payload)` (trigger: `status_changed`)
+
+1. `getReservation(propertyId, reservationId)`. If the payload doesn't already
+   say `checked_in`, the read can briefly lag the webhook — retry up to 4× (3s
+   apart) until check-in is visible.
+2. `extractRoomIds(detail)` → assigned roomIDs (reads `assigned[]`,
+   `guestList[].rooms[]`, `rooms[]`; de-duped).
+3. **Gate.** `checkedIn` = payload status or reservation status/guestStatus ===
+   `checked_in`; `paidInFull` = balance ≤ 0 (unknown/unparseable balance fails
+   closed → treated as *not* paid).
+4. If **not checked-in** → log `awaiting_checkin`, return (no codes).
+5. Compute validity window: open at arrival-day 00:00 UTC, expire at
+   departure-day 23:59 UTC (generous; precise property-TZ times are a follow-up).
+6. For each assigned room:
+   - Upsert `RoomState` → occupied (guestName, checkoutDate,
+     currentReservationId) so the lock-app shows the guest, mapped or not.
+   - If **not paid** → log `awaiting_payment`, continue (a later paid event
+     re-runs and mints it).
+   - Look up `LockMap (propertyId, roomId)`. If **unmapped** → log
+     `no_lock_mapped`, continue.
+   - **Idempotency:** if an active `Passcode` already exists for
+     `(reservationId, roomId)` → skip.
+   - Generate a 6-digit PIN (`crypto.randomInt`), `createPasscode` on TTLock,
+     store the `Passcode` row (incl. `keyboardPwdId` for later revoke), log
+     `passcode_created`.
+   - **Best-effort note:** post `LL-<room>-<PIN>` onto the reservation
+     (`reservationNoteBody`). A note failure logs `reservation_note_failed` but
+     does **not** lose the PIN (the row exists; a retry would skip creation).
+   - On a TTLock/DB create failure → log `passcode_create_failed` and throw
+     (→ `500` → Cloudbeds retries).
+
+### Revoke path — `revokePasscodes(reservationId, event)` (trigger: `deleted`, or status `checked_out` / `canceled` / `no_show`)
+
+1. Find all active `Passcode` rows for the reservation.
+2. For each: `deletePasscode` on TTLock (a missing TTLock passcode is treated as
+   already gone), mark the row `revoked`, free its `RoomState` (occupancyStatus →
+   free; clear guest/checkout/currentReservationId), log `passcode_revoked`.
+
+Idempotent: already-revoked rows are skipped.
+
+### Intent map (after this change)
+
+| Cloudbeds event | Condition | Intent | Effect |
+|---|---|---|---|
+| `reservation/created` | — | ignore | nothing (wait for check-in) |
+| `reservation/status_changed` | status → `checked_in` + paid | ensure | create PIN(s) on mapped rooms |
+| `reservation/status_changed` | status `checked_out`/`canceled`/`no_show` | revoke | delete all PINs for the reservation |
+| `reservation/deleted` | — | revoke | delete all PINs for the reservation |
+| **`reservation/accommodation_changed`** | — | **reconcile** | revoke old room's PIN, create new room's PIN |
+| **`reservation/accommodation_removed`** | — | **reconcile** | revoke the removed room's PIN |
+| `reservation/accommodation_type_changed` | — | ignore (v1) | nothing (no unit move) |
+
 ## Chosen approach — Reconciliation (Approach B)
 
 Treat any room-affecting event as "make TTLock reality match the reservation's
