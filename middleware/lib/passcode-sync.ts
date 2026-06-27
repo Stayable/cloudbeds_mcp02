@@ -72,6 +72,29 @@ function validityWindow(startDate?: string, endDate?: string): { startTs: number
 }
 
 /**
+ * Free a reservation's RoomState rows (occupancy → free), EXCEPT rooms in `keep`.
+ * Occupancy is tracked by `currentReservationId` independent of whether a PIN was
+ * ever created — so a room the guest leaves (or one whose PIN failed to create on
+ * an offline lock) doesn't stay "occupied" forever. Returns rooms freed.
+ */
+async function freeRoomsForReservation(reservationId: string, keep: Set<string> = new Set()): Promise<number> {
+  const rows = await prisma.roomState.findMany({
+    where: { currentReservationId: reservationId, occupancyStatus: { not: "free" } },
+    select: { propertyId: true, roomId: true },
+  });
+  let freed = 0;
+  for (const r of rows) {
+    if (keep.has(r.roomId)) continue;
+    await prisma.roomState.update({
+      where: { propertyId_roomId: { propertyId: r.propertyId, roomId: r.roomId } },
+      data: { occupancyStatus: "free", guestName: null, checkoutDate: null, currentReservationId: null },
+    });
+    freed++;
+  }
+  return freed;
+}
+
+/**
  * Ensure the guest holds a valid PIN on every mapped room of a reservation.
  * Idempotent: a room that already has an active passcode is left untouched.
  */
@@ -111,19 +134,18 @@ export async function ensurePasscodes(
   // the invariant "a live code ⇒ checked-in" holds. (Checkout/cancel/no_show go
   // straight to revoke via classifyIntent; this catches the in-between reversals.)
   if (!checkedIn) {
-    const active = await prisma.passcode.findFirst({ where: { reservationId, status: "active" } });
-    if (active) {
-      const revoked = await revokePasscodes(reservationId, payload.event);
-      return { ...revoked, action: "ensure_revoked_uncheckedin" };
-    }
+    // No longer in-house (e.g. check-in reversed): pull any codes AND free any
+    // rooms this reservation occupied — including a room whose PIN never created
+    // (offline lock), so occupancy doesn't stick.
+    const revoked = await revokePasscodes(reservationId, payload.event);
     await prisma.eventLog.create({
       data: {
         source: "webhook", event: payload.event, propertyId,
         action: "awaiting_checkin",
-        detail: { reservationId, status: detail.status ?? null },
+        detail: { reservationId, status: detail.status ?? null, pinsRevoked: revoked.pinsRevoked },
       },
     });
-    return result;
+    return { ...result, pinsRevoked: revoked.pinsRevoked };
   }
 
   // Prefer the precise dates from the reservation detail; fall back to payload.
@@ -229,6 +251,9 @@ async function createPasscodeForRoom(
       },
     });
     result.pinsCreated++;
+    // The lock just accepted a command → it's reachable. Reflect it online so the
+    // lock-app heatmap is accurate (clears a prior offline flag).
+    await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
 
     await prisma.eventLog.create({
       data: {
@@ -268,14 +293,39 @@ async function createPasscodeForRoom(
       });
     }
   } catch (err: any) {
+    const msg = err?.message ?? String(err);
+    // A gateway/connectivity failure (TTLock -2012) means the lock is unreachable.
+    const offline = /gateway|not connected|-2012/i.test(msg);
+    const label = map.alias?.trim() || roomNameFor(detail, roomId) || roomId;
+
+    if (offline) {
+      // Reflect it offline so the lock-app shows RED (occupied + offline) and lists
+      // it under "Needs attention" — instead of a falsely-green lock.
+      await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
+    }
+
+    // Surface the failure on the Cloudbeds reservation so front-desk sees it.
+    await postReservationNote(
+      registry, propertyId, reservationId,
+      offline
+        ? `⚠ Door code NOT set for ${label} — lock offline (not connected to a gateway). It will be issued automatically once the lock is back online.`
+        : `⚠ Door code NOT set for ${label} — ${msg}`,
+    ).catch(() => {});
+
     await prisma.eventLog.create({
       data: {
         source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
         action: "passcode_create_failed",
-        detail: { reservationId, error: err?.message ?? String(err) },
+        detail: { reservationId, error: msg, offline },
       },
     });
-    throw err; // surface to the route so Cloudbeds retries
+
+    // Offline lock: don't throw — a 1-minute Cloudbeds retry won't fix an offline
+    // lock (and would re-post the failure note). The poll-reconcile cron / the next
+    // check-in event re-attempt the PIN once it's reachable. Other errors (auth/DB)
+    // are transient → throw so Cloudbeds retries.
+    if (offline) return;
+    throw err;
   }
 }
 
@@ -327,6 +377,11 @@ export async function revokePasscodes(
       },
     });
   }
+
+  // Also free any rooms this reservation occupied that had NO active passcode
+  // (e.g. a PIN that failed to create on an offline lock) — occupancy is tracked
+  // independent of passcodes, so checkout/cancel/un-check-in must clear it too.
+  await freeRoomsForReservation(reservationId);
 
   return result;
 }
@@ -380,6 +435,8 @@ export async function reconcilePasscodes(
       },
     });
   }
+  // Free occupancy on rooms the reservation has left — even ones with no passcode.
+  await freeRoomsForReservation(reservationId, desiredSet);
 
   // 2. Create missing — gated. A move of a not-yet-checked-in reservation just
   //    leaves no codes (occupancy still moves once they check in via `ensure`).
@@ -459,6 +516,10 @@ export async function reconcileCheckedInReservations(
         detail: { reservationId: pc.reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change_poll" },
       },
     });
+  }
+  // Free occupancy on rooms each checked-in reservation has left (incl. passcode-less).
+  for (const [rid, { desired }] of byRes) {
+    await freeRoomsForReservation(rid, desired);
   }
 
   // 2. Create missing — for each checked-in reservation's current rooms (gated).
