@@ -31,6 +31,7 @@ export default function OccupancySyncButton({
         { occupied: 0, freed: 0, errors: 0 },
       )
     : null;
+  const firstError = state.results?.find((r) => r.error)?.error;
   return (
     <form action={action} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
       {propertyId && <input type="hidden" name="propertyId" value={propertyId} />}
@@ -39,7 +40,7 @@ export default function OccupancySyncButton({
       {totals && !state.error && (
         <span className="subtle" style={{ fontSize: 12 }}>
           {totals.occupied} occupied · {totals.freed} freed
-          {totals.errors > 0 && ` · ${totals.errors} key error${totals.errors === 1 ? "" : "s"}`}
+          {totals.errors > 0 && ` · ${totals.errors} failed${firstError ? ` (${firstError})` : ""}`}
         </span>
       )}
     </form>

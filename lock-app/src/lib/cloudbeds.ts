@@ -201,8 +201,12 @@ export async function listCheckedInReservations(
 
   const out: ReservationDetail[] = [];
   for (let page = 1; page <= 50; page++) {
+    // includeGuestsDetails returns each reservation's guestList/rooms inline, so
+    // we can read the assigned room from the LIST row and avoid a getReservation
+    // call per reservation (which is what tripped Cloudbeds' rate limit).
     const res = await client.get<ReservationDetail[]>("getReservations", {
-      propertyID: propertyId, status: "checked_in", pageNumber: page, pageSize: 100,
+      propertyID: propertyId, status: "checked_in", includeGuestsDetails: true,
+      pageNumber: page, pageSize: 100,
     });
     const rows = res.data ?? [];
     out.push(...rows);

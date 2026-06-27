@@ -23,6 +23,21 @@ export interface OccupancySyncResult {
   error?: string;
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Retry a Cloudbeds call a couple of times when it reports a rate limit. */
+async function withRateLimitRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (attempt >= tries || !/rate limit/i.test(msg)) throw e;
+      await sleep(attempt * 1500); // 1.5s, 3s backoff
+    }
+  }
+}
+
 /** Run a small async mapper with bounded concurrency (keeps Cloudbeds calls civil). */
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -47,18 +62,19 @@ export async function syncPropertyOccupancy(propertyId: string): Promise<Occupan
     return { propertyId, reservations: 0, occupied: 0, freed: 0, error: `No Cloudbeds key for property ${propertyId}` };
   }
 
-  const rows = await listCheckedInReservations(registry, propertyId);
+  const rows = await withRateLimitRetry(() => listCheckedInReservations(registry, propertyId));
   if (rows == null) {
     return { propertyId, reservations: 0, occupied: 0, freed: 0, error: `No Cloudbeds key for property ${propertyId}` };
   }
 
-  // The list rows may omit room assignments; fetch the detail for any row that
-  // doesn't already carry a room so the mapping is always exact.
-  const detailed = await mapLimit(rows, 6, async (row) => {
+  // Rows now carry room assignments inline (includeGuestsDetails). Only fall back
+  // to a per-reservation getReservation for the rare row missing a room — at low
+  // concurrency, with retry — so we stay well under Cloudbeds' rate limit.
+  const detailed = await mapLimit(rows, 3, async (row) => {
     if (extractRoomIds(row).length > 0) return row;
     const id = row.reservationID != null ? String(row.reservationID) : "";
     if (!id) return row;
-    const detail = await getReservation(registry, propertyId, id);
+    const detail = await withRateLimitRetry(() => getReservation(registry, propertyId, id));
     return detail ? { ...row, ...detail } : row;
   });
 
@@ -95,14 +111,19 @@ export async function syncPropertyOccupancy(propertyId: string): Promise<Occupan
   return { propertyId, reservations: rows.length, occupied: occupied.length, freed: toFree.length };
 }
 
-/** Rehydrate occupancy across several properties in parallel (per-property errors captured). */
+/**
+ * Rehydrate occupancy across several properties. Runs them SEQUENTIALLY (not in
+ * parallel) so we never burst 8 properties' worth of Cloudbeds calls at once —
+ * that is what tripped the rate limit. Per-property errors are captured, not thrown.
+ */
 export async function syncOccupancy(propertyIds: string[]): Promise<OccupancySyncResult[]> {
-  return Promise.all(
-    propertyIds.map((id) =>
-      syncPropertyOccupancy(id).catch((e: unknown) => ({
-        propertyId: id, reservations: 0, occupied: 0, freed: 0,
-        error: e instanceof Error ? e.message : String(e),
-      })),
-    ),
-  );
+  const results: OccupancySyncResult[] = [];
+  for (const id of propertyIds) {
+    try {
+      results.push(await syncPropertyOccupancy(id));
+    } catch (e: unknown) {
+      results.push({ propertyId: id, reservations: 0, occupied: 0, freed: 0, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return results;
 }
