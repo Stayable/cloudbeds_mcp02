@@ -1,0 +1,89 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/rbac";
+import { renameLock } from "@/lib/ttlock";
+import { canonicalLockName, unassignedLockName } from "@/lib/lock-naming";
+import { CloudbedsRegistry } from "@/lib/cloudbeds";
+import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
+import { buildDetail } from "@/lib/audit";
+import { writeAudit } from "@/lib/audit-write";
+
+/** Revalidate the room detail, devices list, and the lock detail after a change. */
+function revalidateLockSurfaces(propertyId: string, roomId: string | null, lockId: bigint): void {
+  if (roomId) revalidatePath(`/p/${propertyId}/rooms/${roomId}`);
+  revalidatePath(`/p/${propertyId}/devices`);
+  revalidatePath(`/p/${propertyId}/devices/${lockId}`);
+  revalidatePath(`/p/${propertyId}/dashboard`);
+}
+
+/**
+ * Assign an existing lock (from the property's available pool) to a room. The
+ * lockId + roomId arrive from dropdowns — no free-text IDs. We re-derive the room
+ * NUMBER from Cloudbeds (never trusting a client label), rename the lock in TTLock
+ * to canonical `<ABBR>-<room>` so its name follows the app, create the mapping,
+ * drop any other rows for this lock, and clear it from the pool/queue.
+ */
+export async function assignLockToRoom(formData: FormData): Promise<void> {
+  const propertyId = String(formData.get("propertyId") ?? "").trim();
+  const roomId = String(formData.get("roomId") ?? "").trim();
+  const lockIdRaw = String(formData.get("lockId") ?? "").trim();
+  if (!propertyId || !roomId) throw new Error("Missing propertyId or roomId");
+  if (!/^\d+$/.test(lockIdRaw)) throw new Error("Pick a lock to assign");
+  const user = await requirePermission("mapping.edit", propertyId);
+  const lockId = BigInt(lockIdRaw);
+
+  const index = await loadRoomIndex(CloudbedsRegistry.fromEnv(), propertyId);
+  if (!index) {
+    throw new Error(`No Cloudbeds key for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} so rooms can be resolved.`);
+  }
+  const roomNumber = resolveNameFromId(index, roomId);
+  if (!roomNumber) throw new Error(`Room ${roomId} is not a current Cloudbeds room for this property.`);
+  const name = canonicalLockName(propertyId, roomNumber);
+  if (!name) throw new Error("Unknown property or empty room");
+
+  // Rename in TTLock first — a failure here leaves nothing half-assigned.
+  await renameLock(lockId, name);
+  await prisma.lockMap.upsert({
+    where: { propertyId_roomId: { propertyId, roomId } },
+    create: { propertyId, roomId, roomName: roomNumber, lockId, alias: name },
+    update: { lockId, roomName: roomNumber, alias: name },
+  });
+  await prisma.lockMap.deleteMany({ where: { lockId, NOT: { propertyId, roomId } } });
+  await prisma.unassignedLock.deleteMany({ where: { lockId } });
+  await writeAudit(user, {
+    action: "mapping_changed", propertyId, roomId, lockId,
+    detail: buildDetail({ message: `assigned + renamed to ${name} (room ${roomNumber} → ${roomId})`, extra: { to: String(lockId), name } }),
+  });
+  revalidateLockSurfaces(propertyId, roomId, lockId);
+}
+
+/**
+ * Remove a room→lock mapping. To make the unmap STICK, we first rename the lock
+ * in TTLock to a non-conforming `<ABBR> (unassigned)` name — otherwise the next
+ * discovery sync would see the still-conforming `LL-239` name and re-map it. The
+ * lock then lives in the property's available pool (UnassignedLock). Codes already
+ * on the physical lock are untouched.
+ */
+export async function unmapRoom(propertyId: string, roomId: string): Promise<void> {
+  const user = await requirePermission("mapping.edit", propertyId);
+  const existing = await prisma.lockMap.findUnique({
+    where: { propertyId_roomId: { propertyId, roomId } },
+  });
+  if (!existing) return;
+
+  const unassignedName = unassignedLockName(propertyId) ?? "(unassigned)";
+  await renameLock(existing.lockId, unassignedName); // first: a failure aborts before we drop a good mapping
+  await prisma.lockMap.delete({ where: { propertyId_roomId: { propertyId, roomId } } });
+  await prisma.unassignedLock.upsert({
+    where: { lockId: existing.lockId },
+    create: { lockId: existing.lockId, name: unassignedName, battery: existing.battery, online: existing.online, lastSeen: existing.lastSeen },
+    update: { name: unassignedName, battery: existing.battery, online: existing.online, lastSeen: existing.lastSeen },
+  });
+  await writeAudit(user, {
+    action: "mapping_changed", propertyId, roomId, lockId: existing.lockId,
+    detail: buildDetail({ message: `unmapped + renamed to "${unassignedName}"`, extra: { from: String(existing.lockId) } }),
+  });
+  revalidateLockSurfaces(propertyId, roomId, existing.lockId);
+}

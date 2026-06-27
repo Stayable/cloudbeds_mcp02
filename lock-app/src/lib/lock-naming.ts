@@ -26,6 +26,27 @@ export function canonicalLockName(propertyId: string, room: string): string | nu
   return `${abbr}-${trimmed}`;
 }
 
+/**
+ * Name given to a lock that has been unmapped from a room but still belongs to a
+ * property: `<ABBR> (unassigned)` (e.g. "LL (unassigned)"). Deliberately has NO
+ * hyphen so parseLockName rejects it and the discovery sync won't auto-map it
+ * back — while the abbr keeps it recognizable as that property's lock and lets
+ * propertyOfUnassignedName() recover the property for the per-property pool.
+ */
+export function unassignedLockName(propertyId: string): string | null {
+  const abbr = PROPERTY_TO_ABBR.get(propertyId);
+  return abbr ? `${abbr} (unassigned)` : null;
+}
+
+/** Inverse of unassignedLockName: the propertyId for an `<ABBR> (unassigned)` name, else null. */
+export function propertyOfUnassignedName(name: string): string | null {
+  const trimmed = name.trim();
+  for (const [id] of PROPERTY_TO_ABBR) {
+    if (trimmed === unassignedLockName(id)) return id;
+  }
+  return null;
+}
+
 export interface ParsedLockName {
   propertyId: string;
   room: string;

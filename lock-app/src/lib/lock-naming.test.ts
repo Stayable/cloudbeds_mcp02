@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseLockName, classifyLock, canonicalLockName, guessRoomNumber } from "./lock-naming";
+import {
+  parseLockName, classifyLock, canonicalLockName, guessRoomNumber,
+  unassignedLockName, propertyOfUnassignedName,
+} from "./lock-naming";
 
 describe("parseLockName", () => {
   it("maps a conforming name to property + room", () => {
@@ -76,6 +79,23 @@ describe("canonicalLockName", () => {
 
   it("returns null for an empty room", () => {
     expect(canonicalLockName("210986", "  ")).toBeNull();
+  });
+});
+
+describe("unassigned naming", () => {
+  it("builds <ABBR> (unassigned) and is NON-conforming so discovery won't re-map it", () => {
+    expect(unassignedLockName("210972")).toBe("LL (unassigned)");
+    expect(parseLockName("LL (unassigned)")).toBeNull();
+    expect(classifyLock("LL (unassigned)", false)).toEqual({ kind: "queue" });
+  });
+  it("recovers the property from an unassigned name, else null", () => {
+    expect(propertyOfUnassignedName("LL (unassigned)")).toBe("210972");
+    expect(propertyOfUnassignedName("  KE (unassigned) ")).toBe("210986");
+    expect(propertyOfUnassignedName("LL-239")).toBeNull();
+    expect(propertyOfUnassignedName("random lock")).toBeNull();
+  });
+  it("returns null for an unknown property", () => {
+    expect(unassignedLockName("999999")).toBeNull();
   });
 });
 

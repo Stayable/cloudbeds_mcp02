@@ -4,13 +4,16 @@ import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { splitCodes, type PasscodeInput } from "@/lib/door-detail";
 import { loadGuestDetails } from "@/lib/guest-loader";
+import { unassignedLockName } from "@/lib/lock-naming";
+import { CloudbedsRegistry } from "@/lib/cloudbeds";
+import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import Forbidden from "@/components/Forbidden";
 import RevealButton from "./RevealButton";
 import {
   revealGuestCode, revokeGuestCode, generateManualCode,
   revealBackupCode, rotateBackupCode, syncFromLock,
-  upsertMapping, deleteMapping,
 } from "./actions";
+import { assignLockToRoom, unmapRoom } from "@/app/(app)/lock-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +39,23 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
 
   const battery = map?.battery ?? null;
   const battColor = battery == null ? "var(--faint)" : battery < 20 ? "var(--crit-ink)" : "var(--ink)";
-  const label = map?.alias?.trim() || roomId;
-  const roomNumber = map?.roomName?.trim() || roomId;
+
+  // Resolve the human room NUMBER. A mapped room has it on the LockMap; an
+  // unmapped room only has the Cloudbeds roomID — look the number up so the
+  // header reads "104", not "405758-3". Also load the property's available lock
+  // pool so an unmapped room can be assigned a lock from a dropdown.
+  const registry = CloudbedsRegistry.fromEnv();
+  const poolName = unassignedLockName(propertyId);
+  const [resolvedNumber, availableLocks] = await Promise.all([
+    map?.roomName?.trim()
+      ? Promise.resolve(map.roomName.trim())
+      : loadRoomIndex(registry, propertyId).then((idx) => (idx ? resolveNameFromId(idx, roomId) : null)).catch(() => null),
+    can("mapping.edit") && poolName
+      ? prisma.unassignedLock.findMany({ where: { name: poolName }, orderBy: { lockId: "asc" } })
+      : Promise.resolve([]),
+  ]);
+  const roomNumber = resolvedNumber || roomId;
+  const label = map?.alias?.trim() || roomNumber;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -168,17 +186,36 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
           {can("mapping.edit") && (
             <div className="card">
               <div className="card-title" style={{ marginBottom: 14 }}>Room → lock mapping</div>
-              <form action={upsertMapping} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <input type="hidden" name="propertyId" value={propertyId} />
-                <input type="hidden" name="roomId" value={roomId} />
-                <div style={{ flex: 1, minWidth: 130 }}><label className="lbl">TTLOCK LOCK ID</label><input name="lockId" placeholder="e.g. 27083179" defaultValue={map ? String(map.lockId) : ""} className="field mono" style={{ width: "100%" }} /></div>
-                <div style={{ flex: 1, minWidth: 110 }}><label className="lbl">ALIAS</label><input name="alias" placeholder="optional" defaultValue={map?.alias ?? ""} className="field" style={{ width: "100%" }} /></div>
-                <button className="btn btn-navy">{map ? "Update" : "Create"}</button>
-              </form>
-              {map && (
-                <form action={async () => { "use server"; await deleteMapping(propertyId, roomId); }} style={{ marginTop: 10 }}>
-                  <button className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}>Remove mapping</button>
+              {map ? (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 13, alignItems: "baseline", marginBottom: 14 }}>
+                    <span className="lbl">Lock</span><span className="mono">{map.alias?.trim() || `Lock ${map.lockId}`}</span>
+                    <span className="lbl">Lock ID</span><span className="mono">{String(map.lockId)}</span>
+                  </div>
+                  <form action={async () => { "use server"; await unmapRoom(propertyId, roomId); }}>
+                    <button className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}>Remove lock from this room</button>
+                  </form>
+                  <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>Removing renames the lock to “{poolName ?? "(unassigned)"}” and returns it to this property’s available pool.</p>
+                </>
+              ) : availableLocks.length > 0 ? (
+                <form action={assignLockToRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                  <input type="hidden" name="propertyId" value={propertyId} />
+                  <input type="hidden" name="roomId" value={roomId} />
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <label className="lbl">ASSIGN AN AVAILABLE LOCK</label>
+                    <select name="lockId" required defaultValue="" className="field" style={{ width: "100%", height: 44 }}>
+                      <option value="" disabled>Pick a lock…</option>
+                      {availableLocks.map((l) => (
+                        <option key={String(l.lockId)} value={String(l.lockId)}>
+                          Lock {String(l.lockId)}{l.battery != null ? ` · ${l.battery}%` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn btn-primary" style={{ height: 44 }}>Assign</button>
                 </form>
+              ) : (
+                <p className="subtle">No available locks in {poolName ? `“${poolName.split(" ")[0]}”` : "this property"}’s pool. Unmap a lock from another room to free one, or assign a brand-new lock from the <span style={{ fontWeight: 600 }}>Unassigned</span> queue.</p>
               )}
             </div>
           )}
