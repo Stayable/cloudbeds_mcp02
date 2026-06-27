@@ -100,6 +100,9 @@ export async function syncDiscoveredLocks(): Promise<SyncSummary> {
         });
         summary.queued++;
       } else {
+        // Keep the manual mapping, but refresh the stored TTLock name + battery so
+        // the Devices "TTLock name" reflects a rename done directly in the app.
+        await prisma.lockMap.updateMany({ where: { lockId }, data: { alias: name, battery } });
         summary.kept++;
       }
     } catch (e: any) {
