@@ -128,3 +128,54 @@ export async function listRooms(
   }
   return out;
 }
+
+/** Minimal reservation shape the room detail page needs (name + lease dates;
+ *  Cloudbeds sometimes includes primary-guest contact + guestID here). */
+export interface ReservationDetail {
+  guestName?: string;
+  guestID?: string | number;
+  startDate?: string;
+  endDate?: string;
+  email?: string;
+  phone?: string;
+  [k: string]: unknown;
+}
+
+/** Minimal guest record — contact fields only. */
+export interface GuestRecord {
+  email?: string;
+  phone?: string;
+  cellPhone?: string;
+  [k: string]: unknown;
+}
+
+/** Fetch one reservation's detail (name, lease dates, primary guest). Returns
+ *  null if no Cloudbeds key is configured for the property. */
+export async function getReservation(
+  registry: CloudbedsRegistry,
+  propertyId: string,
+  reservationId: string,
+): Promise<ReservationDetail | null> {
+  const client = registry.resolve(propertyId);
+  if (!client) return null;
+  const res = await client.get<ReservationDetail>("getReservation", {
+    propertyID: propertyId,
+    reservationID: reservationId,
+  });
+  return (res.data ?? {}) as ReservationDetail;
+}
+
+/** Fetch one guest's contact record. Returns null if no key for the property. */
+export async function getGuest(
+  registry: CloudbedsRegistry,
+  propertyId: string,
+  guestId: string,
+): Promise<GuestRecord | null> {
+  const client = registry.resolve(propertyId);
+  if (!client) return null;
+  const res = await client.get<GuestRecord>("getGuest", {
+    propertyID: propertyId,
+    guestID: guestId,
+  });
+  return (res.data ?? {}) as GuestRecord;
+}
