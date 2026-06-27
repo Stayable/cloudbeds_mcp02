@@ -1,10 +1,9 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
-import { PROPERTIES } from "@/lib/properties";
 import { guessRoomNumber } from "@/lib/lock-naming";
 import Forbidden from "@/components/Forbidden";
 import SyncButton from "./SyncButton";
-import { assignUnassignedLock } from "./actions";
+import AssignForm from "./AssignForm";
 
 export const dynamic = "force-dynamic";
 
@@ -53,15 +52,7 @@ export default async function UnassignedPage() {
                 </div>
                 <span className={`pill ${l.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{l.online ? "online" : "offline"}</span>
                 {canAssign && (
-                  <form action={assignUnassignedLock} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end", minWidth: 260 }}>
-                    <input type="hidden" name="lockId" value={l.lockId.toString()} />
-                    <select name="propertyId" required className="field" style={{ height: 38 }} defaultValue="">
-                      <option value="" disabled>Property…</option>
-                      {PROPERTIES.map((p) => <option key={p.id} value={p.id}>{p.abbr} — {p.name}</option>)}
-                    </select>
-                    <input name="room" placeholder="Room" required defaultValue={guessRoomNumber(l.name)} className="field" style={{ height: 38, width: 90 }} />
-                    <button type="submit" className="btn btn-primary" style={{ height: 38 }}>Assign</button>
-                  </form>
+                  <AssignForm lockId={l.lockId.toString()} guessRoom={guessRoomNumber(l.name)} />
                 )}
               </div>
             );

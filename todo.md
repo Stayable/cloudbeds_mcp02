@@ -5,7 +5,17 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
-RESUME HERE (2026-06-27) — **Resolver SHIPPED + checkout→revoke verified live; 2 locks mapped at Lakeland.**
+RESUME HERE (2026-06-27 PM) — **Assign-room is now a Cloudbeds ROOM DROPDOWN (no free text).**
+• ✅ Unassigned-queue assign: room is now a cascading dropdown of the property's REAL Cloudbeds
+  rooms (`/api/rooms?propertyId=`), value = roomID → matched automatically; can't pick a room that
+  doesn't exist. Property-first, then rooms load. No key → select disabled w/ "add CLOUDBEDS_API_KEY_<id>"
+  notice (dropdown-only per BK). New `AssignForm.tsx` (client, cascade) + `/api/rooms` route. Server
+  action now takes `roomId`, re-derives the room# authoritatively via `resolveNameFromId` (rejects
+  forged/stale ids), then renames lock to `<ABBR>-<room>` + maps. resolver gained `byId` index
+  (+4 tests). 100/100 tests, typecheck + build green. Renaming = the assign action, so it's covered
+  by the same rule. NOT YET DEPLOYED (vercel --prod from lock-app/) + needs the read keys live.
+--- earlier 2026-06-27 ---
+RESUME (2026-06-27) — **Resolver SHIPPED + checkout→revoke verified live; 2 locks mapped at Lakeland.**
 This session:
 • ✅ **Full check-in cycle PROVEN LIVE** (event log): passcode_created → reservation_note_posted →
   code_revealed → **passcode_revoked on checkout** (res 3435425699816). The "untested checkout→revoke"

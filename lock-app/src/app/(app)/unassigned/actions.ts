@@ -7,7 +7,7 @@ import { syncDiscoveredLocks, type SyncSummary } from "@/lib/lock-sync";
 import { canonicalLockName } from "@/lib/lock-naming";
 import { renameLock } from "@/lib/ttlock";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
-import { loadRoomIndex, resolveFromIndex } from "@/lib/room-resolver";
+import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
 
@@ -39,39 +39,41 @@ export async function runLockSync(_prev: SyncState, _formData: FormData): Promis
 }
 
 /**
- * Assign a queued lock to a property + room: rename the lock in TTLock to the
- * canonical `<ABBR>-<room>` (so the TTLock name stays the source of truth — no
- * need to open the TTLock app), create the mapping, and clear it from the queue.
+ * Assign a queued lock to a property + room. The room arrives as a Cloudbeds
+ * `roomId` chosen from a dropdown of the property's REAL rooms — so the room
+ * always exists and the roomID (which the check-in webhook matches on) is exact.
+ * We re-derive the human room number from Cloudbeds server-side (never trusting
+ * the client's label or a forged id), rename the lock in TTLock to the canonical
+ * `<ABBR>-<room>` (so the TTLock name stays the source of truth — no need to open
+ * the TTLock app), create the mapping, and clear it from the queue.
  */
 export async function assignUnassignedLock(formData: FormData): Promise<void> {
   const lockIdRaw = String(formData.get("lockId") ?? "").trim();
   const propertyId = String(formData.get("propertyId") ?? "").trim();
-  const room = String(formData.get("room") ?? "").trim();
+  const roomId = String(formData.get("roomId") ?? "").trim();
   if (!/^\d+$/.test(lockIdRaw)) throw new Error("Bad lockId");
   if (!propertyId) throw new Error("Property required");
-  if (!room) throw new Error("Room required");
-
-  const name = canonicalLockName(propertyId, room);
-  if (!name) throw new Error("Unknown property or empty room");
+  if (!roomId) throw new Error("Room required");
 
   const user = await requirePermission("mapping.edit", propertyId);
   const lockId = BigInt(lockIdRaw);
 
-  // Resolve the typed room NUMBER to the Cloudbeds roomID the check-in webhook
-  // matches on. Do this BEFORE renaming/mapping so a bad room number fails loudly
-  // instead of creating a mapping that silently never drives a PIN.
+  // Confirm the chosen roomId is a real room for this property and get its
+  // authoritative room NUMBER (the lock-name token). Do this BEFORE renaming/
+  // mapping so a stale/forged id fails loudly instead of creating a dead mapping.
   const index = await loadRoomIndex(CloudbedsRegistry.fromEnv(), propertyId);
   if (!index) {
     throw new Error(
-      `No Cloudbeds key configured for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} to the lock-app so room numbers can be resolved.`,
+      `No Cloudbeds key configured for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} to the lock-app so rooms can be listed.`,
     );
   }
-  const roomId = resolveFromIndex(index, room);
-  if (!roomId) {
-    throw new Error(
-      `Room "${room}" was not found in Cloudbeds for this property (or the number is ambiguous). Check the room number.`,
-    );
+  const room = resolveNameFromId(index, roomId);
+  if (!room) {
+    throw new Error(`Room ${roomId} is not a current Cloudbeds room for this property. Re-pick the room.`);
   }
+
+  const name = canonicalLockName(propertyId, room);
+  if (!name) throw new Error("Unknown property or empty room");
 
   // Rename in TTLock first — if this fails (e.g. gateway/lock unreachable) we
   // surface the error and leave the queue untouched rather than mapping a lock

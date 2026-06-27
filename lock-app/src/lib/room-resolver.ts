@@ -12,6 +12,8 @@ import { CloudbedsRegistry, listRooms, type CloudbedsRoom } from "./cloudbeds";
 export interface RoomIndex {
   /** roomName (room number, trimmed) → Cloudbeds roomID, for unambiguous names. */
   byName: Map<string, string>;
+  /** Cloudbeds roomID → roomName (room number). roomIDs are unique within a property. */
+  byId: Map<string, string>;
   /** Room numbers that appear on more than one room — never auto-resolved. */
   ambiguous: Set<string>;
 }
@@ -23,11 +25,13 @@ export interface RoomIndex {
  */
 export function buildRoomIndex(rooms: CloudbedsRoom[]): RoomIndex {
   const byName = new Map<string, string>();
+  const byId = new Map<string, string>();
   const ambiguous = new Set<string>();
   for (const r of rooms) {
     const name = (r.roomName ?? "").trim();
     const id = (r.roomID ?? "").trim();
     if (!name || !id) continue;
+    byId.set(id, name);
     const existing = byName.get(name);
     if (existing && existing !== id) {
       ambiguous.add(name);
@@ -35,7 +39,7 @@ export function buildRoomIndex(rooms: CloudbedsRoom[]): RoomIndex {
       byName.set(name, id);
     }
   }
-  return { byName, ambiguous };
+  return { byName, byId, ambiguous };
 }
 
 /**
@@ -46,6 +50,19 @@ export function resolveFromIndex(index: RoomIndex, roomNumber: string): string |
   const name = roomNumber.trim();
   if (!name || index.ambiguous.has(name)) return null;
   return index.byName.get(name) ?? null;
+}
+
+/**
+ * Reverse of resolveFromIndex: resolve a Cloudbeds roomID to its room number,
+ * confirming the roomID actually belongs to this property. Used when the assign
+ * UI submits a roomID chosen from a dropdown — the server re-derives the room
+ * number from Cloudbeds rather than trusting the client's label, and rejects any
+ * roomID that isn't a real room for the property. Returns null if unknown.
+ */
+export function resolveNameFromId(index: RoomIndex, roomId: string): string | null {
+  const id = roomId.trim();
+  if (!id) return null;
+  return index.byId.get(id) ?? null;
 }
 
 /**

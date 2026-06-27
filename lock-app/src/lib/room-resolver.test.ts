@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildRoomIndex, resolveFromIndex } from "./room-resolver";
+import { buildRoomIndex, resolveFromIndex, resolveNameFromId } from "./room-resolver";
 
 describe("buildRoomIndex / resolveFromIndex", () => {
   const rooms = [
@@ -42,5 +42,38 @@ describe("buildRoomIndex / resolveFromIndex", () => {
     ]);
     expect(resolveFromIndex(idx, "201")).toBe("405758-2");
     expect(resolveFromIndex(idx, "200")).toBeNull();
+  });
+});
+
+describe("resolveNameFromId", () => {
+  const rooms = [
+    { roomID: "405758-102", roomName: "292" },
+    { roomID: "405761-25", roomName: "239" },
+  ];
+
+  it("resolves a Cloudbeds roomID back to its room number (authoritative)", () => {
+    const idx = buildRoomIndex(rooms);
+    expect(resolveNameFromId(idx, "405758-102")).toBe("292");
+    expect(resolveNameFromId(idx, "405761-25")).toBe("239");
+  });
+
+  it("trims whitespace on the lookup", () => {
+    const idx = buildRoomIndex(rooms);
+    expect(resolveNameFromId(idx, "  405758-102 ")).toBe("292");
+  });
+
+  it("returns null for a roomID not in this property (forged/stale value)", () => {
+    const idx = buildRoomIndex(rooms);
+    expect(resolveNameFromId(idx, "999-1")).toBeNull();
+    expect(resolveNameFromId(idx, "")).toBeNull();
+  });
+
+  it("resolves ambiguous-NAME rooms by id without trouble (ids are unique)", () => {
+    const idx = buildRoomIndex([
+      { roomID: "405758-1", roomName: "105" },
+      { roomID: "405763-9", roomName: "105" },
+    ]);
+    expect(resolveNameFromId(idx, "405758-1")).toBe("105");
+    expect(resolveNameFromId(idx, "405763-9")).toBe("105");
   });
 });
