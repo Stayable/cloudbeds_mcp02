@@ -28,8 +28,12 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
     listRooms(registry, propertyId).catch(() => null),
   ]);
 
-  // Cloudbeds roomID → human room number, for friendly action labels.
+  // Cloudbeds roomID → human room number, for friendly action labels. Names come
+  // from the Cloudbeds inventory (covers unmapped rooms too) with mapped LockMap
+  // roomNames layered on top, so a "no guest code" alert reads "room 305", not
+  // the raw roomID "405763-1".
   const roomNameById: Record<string, string> = {};
+  for (const r of cbRooms ?? []) if (r.roomName) roomNameById[r.roomID] = r.roomName;
   for (const l of locks) if (l.roomName) roomNameById[l.roomId] = l.roomName;
 
   // Full-inventory room heatmap (same chips as the Portfolio squares, but labeled
@@ -82,25 +86,6 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <span className="card-title">Needs attention</span>
-          <Link href={`/p/${propertyId}/alerts`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>View all</Link>
-        </div>
-        {actions.length === 0 ? (
-          <p className="subtle" style={{ color: "var(--ok-ink)" }}>All clear — nothing needs attention.</p>
-        ) : (
-          actions.map((a, i) => (
-            <Link key={`${a.kind}-${a.roomId}-${i}`} href={`/p/${propertyId}/rooms/${a.roomId}`}
-              style={{ display: "flex", gap: 12, alignItems: "center", padding: "11px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
-              <span style={{ width: 9, height: 9, borderRadius: 9, flex: "0 0 auto", background: a.severity === "critical" ? "var(--crit)" : "var(--warn)" }} />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{a.label}</span>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--faint)" strokeWidth={1.8} strokeLinecap="round"><path d="M5 3l5 5-5 5" /></svg>
-            </Link>
-          ))
-        )}
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
           <span className="card-title">All rooms{roomChips.length ? ` · ${roomChips.length}` : ""}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -117,6 +102,28 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
           </>
         )}
       </div>
+
+      <details className="card accordion" open style={{ marginTop: 16 }}>
+        <summary className="accordion-summary">
+          <span className="card-title">Needs attention</span>
+          <span className={`chip ${actions.length === 0 ? "chip-ok" : critical ? "chip-crit" : "chip-warn"}`}>{actions.length}</span>
+          <svg className="accordion-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M4 6l4 4 4-4" /></svg>
+        </summary>
+        <div className="accordion-body">
+          {actions.length === 0 ? (
+            <p className="subtle" style={{ color: "var(--ok-ink)" }}>All clear — nothing needs attention.</p>
+          ) : (
+            actions.map((a, i) => (
+              <Link key={`${a.kind}-${a.roomId}-${i}`} href={`/p/${propertyId}/rooms/${a.roomId}`}
+                style={{ display: "flex", gap: 12, alignItems: "center", padding: "11px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
+                <span style={{ width: 9, height: 9, borderRadius: 9, flex: "0 0 auto", background: a.severity === "critical" ? "var(--crit)" : "var(--warn)" }} />
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{a.label}</span>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--faint)" strokeWidth={1.8} strokeLinecap="round"><path d="M5 3l5 5-5 5" /></svg>
+              </Link>
+            ))
+          )}
+        </div>
+      </details>
     </div>
   );
 }
