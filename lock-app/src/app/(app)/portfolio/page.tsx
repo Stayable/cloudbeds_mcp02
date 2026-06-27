@@ -6,6 +6,7 @@ import { summarizeProperty } from "@/lib/overview";
 import { buildRoomChips, type Occupancy, type RoomChipInput } from "@/lib/rooms";
 import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
+import OccupancySyncButton from "@/components/OccupancySyncButton";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export default async function PortfolioPage() {
   const totOffline = locks.filter((l) => !l.online).length;
 
   const canDiscover = sessionCan(user, "lock.discover");
+  const canSync = sessionCan(user, "lock.sync");
   const unassignedCount = canDiscover ? await prisma.unassignedLock.count() : 0;
 
   return (
@@ -73,6 +75,7 @@ export default async function PortfolioPage() {
             {props.length} {props.length === 1 ? "property" : "properties"} · {totalLocks} locks · live status
           </p>
           <RoomHeatmapLegend />
+          {canSync && <div style={{ marginTop: 10 }}><OccupancySyncButton label="Sync occupancy from Cloudbeds" /></div>}
         </div>
         <div className="fleet-stats">
           <div className="fleet-stat"><div className="n tnum" style={{ color: "var(--ok)" }}>{totOnline}</div><div className="l">online</div></div>

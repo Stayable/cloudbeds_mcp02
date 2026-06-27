@@ -6,6 +6,7 @@ import { buildDashboard, type Occupancy } from "@/lib/dashboard";
 import { buildRoomChips, type RoomChipInput } from "@/lib/rooms";
 import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
+import OccupancySyncButton from "@/components/OccupancySyncButton";
 import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
@@ -102,7 +103,10 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
           <span className="card-title">All rooms{roomChips.length ? ` · ${roomChips.length}` : ""}</span>
-          <Link href={`/p/${propertyId}/rooms`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>List view</Link>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            {sessionCan(user, "lock.sync", propertyId) && <OccupancySyncButton propertyId={propertyId} />}
+            <Link href={`/p/${propertyId}/rooms`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>List view</Link>
+          </div>
         </div>
         {roomChips.length === 0 ? (
           <p className="subtle">No rooms found — check the Cloudbeds key for this property.</p>

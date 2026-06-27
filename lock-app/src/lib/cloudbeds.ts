@@ -130,9 +130,18 @@ export async function listRooms(
   return out;
 }
 
+/** A single assigned room within a reservation (Cloudbeds getReservation). */
+export interface ReservationRoom {
+  roomID?: string;
+  roomName?: string;
+  [k: string]: unknown;
+}
+
 /** Minimal reservation shape the room detail page needs (name + lease dates;
  *  Cloudbeds sometimes includes primary-guest contact + guestID here). */
 export interface ReservationDetail {
+  reservationID?: string | number;
+  status?: string;
   guestName?: string;
   guestID?: string | number;
   startDate?: string;
@@ -141,7 +150,65 @@ export interface ReservationDetail {
   phone?: string;        // legacy/defensive
   guestEmail?: string;   // Cloudbeds actual
   guestPhone?: string;   // Cloudbeds actual
+  // room assignment can appear under any of these depending on endpoint/account
+  assigned?: ReservationRoom[];
+  rooms?: ReservationRoom[];
+  guestList?: Record<string, { roomID?: string; rooms?: ReservationRoom[]; [k: string]: unknown }> | null;
   [k: string]: unknown;
+}
+
+/** Every room object referenced by a reservation, across the shapes Cloudbeds uses. */
+function allReservationRooms(detail: ReservationDetail): ReservationRoom[] {
+  const out: ReservationRoom[] = [];
+  if (Array.isArray(detail.assigned)) out.push(...detail.assigned);
+  if (Array.isArray(detail.rooms)) out.push(...detail.rooms);
+  if (detail.guestList) {
+    for (const g of Object.values(detail.guestList)) {
+      if (g?.roomID) out.push({ roomID: g.roomID });
+      if (Array.isArray(g?.rooms)) out.push(...g.rooms);
+    }
+  }
+  return out;
+}
+
+/** Distinct assigned roomIDs for a reservation (deduped, blanks skipped). */
+export function extractRoomIds(detail: ReservationDetail): string[] {
+  const ids = allReservationRooms(detail)
+    .map((r) => (r?.roomID != null ? String(r.roomID).trim() : ""))
+    .filter((id) => id.length > 0);
+  return [...new Set(ids)];
+}
+
+/** Human room name (e.g. "239") for a roomID within a reservation, if present. */
+export function roomNameFor(detail: ReservationDetail, roomId: string): string | null {
+  const match = allReservationRooms(detail).find((r) => String(r?.roomID ?? "").trim() === roomId);
+  const name = match?.roomName != null ? String(match.roomName).trim() : "";
+  return name.length > 0 ? name : null;
+}
+
+/**
+ * List the property's currently checked-in reservations (Cloudbeds getReservations,
+ * status=checked_in), paginated. Returns null if no key for the property. Rows may
+ * or may not carry room assignments depending on the account — the caller falls
+ * back to getReservation() per row when needed.
+ */
+export async function listCheckedInReservations(
+  registry: CloudbedsRegistry,
+  propertyId: string,
+): Promise<ReservationDetail[] | null> {
+  const client = registry.resolve(propertyId);
+  if (!client) return null;
+
+  const out: ReservationDetail[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await client.get<ReservationDetail[]>("getReservations", {
+      propertyID: propertyId, status: "checked_in", pageNumber: page, pageSize: 100,
+    });
+    const rows = res.data ?? [];
+    out.push(...rows);
+    if (rows.length < 100) break; // last page
+  }
+  return out;
 }
 
 /** Minimal guest record — contact fields only. */
