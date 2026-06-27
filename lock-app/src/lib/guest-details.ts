@@ -36,7 +36,7 @@ export function toGuestDetails(input: {
   const g = input.guest;
   const name = (r.guestName ?? "").trim() || "Guest";
   const email = (r.email ?? g?.email ?? "").trim() || null;
-  const phone = (r.phone ?? g?.phone ?? g?.cellPhone ?? "").trim() || null;
+  const phone = (r.phone ?? g?.cellPhone ?? g?.phone ?? "").trim() || null;
   return {
     name,
     email,

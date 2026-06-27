@@ -45,4 +45,13 @@ describe("toGuestDetails", () => {
     const d = toGuestDetails({ reservation: { guestName: "Sam", startDate: "25 Jun" }, guest: null, roomNumber: "101" });
     expect(d.leaseStart).toBe("25 Jun");
   });
+
+  it("prefers guest cellPhone over guest landline phone", () => {
+    const d = toGuestDetails({
+      reservation: { guestName: "Sam" },
+      guest: { phone: "863-555-0000", cellPhone: "863-555-0199" },
+      roomNumber: "101",
+    });
+    expect(d.phone).toBe("863-555-0199");
+  });
 });

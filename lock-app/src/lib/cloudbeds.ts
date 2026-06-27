@@ -43,6 +43,7 @@ export class CloudbedsClient {
     const res = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json", "x-api-key": this.apiKey },
+      signal: AbortSignal.timeout(6000),
     });
     const text = await res.text();
     let json: CloudbedsResponse<T> | undefined;
@@ -136,8 +137,10 @@ export interface ReservationDetail {
   guestID?: string | number;
   startDate?: string;
   endDate?: string;
-  email?: string;
-  phone?: string;
+  email?: string;        // legacy/defensive
+  phone?: string;        // legacy/defensive
+  guestEmail?: string;   // Cloudbeds actual
+  guestPhone?: string;   // Cloudbeds actual
   [k: string]: unknown;
 }
 
@@ -146,6 +149,9 @@ export interface GuestRecord {
   email?: string;
   phone?: string;
   cellPhone?: string;
+  guestEmail?: string;      // Cloudbeds actual
+  guestPhone?: string;      // Cloudbeds actual
+  guestCellPhone?: string;  // Cloudbeds actual
   [k: string]: unknown;
 }
 
