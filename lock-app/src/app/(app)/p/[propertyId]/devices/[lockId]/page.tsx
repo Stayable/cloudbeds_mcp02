@@ -29,7 +29,7 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
   const inPool = !!pooled && pooled.name === poolName;
   if (!mapped && !inPool) return <Forbidden what="this lock for this property" />;
 
-  const name = mapped?.alias?.trim() || pooled?.name?.trim() || `Lock ${lockIdStr}`;
+  const name = mapped?.alias?.trim() || pooled?.name?.trim() || `${property.abbr} ${lockIdStr}`;
   const online = mapped?.online ?? pooled?.online ?? false;
   const battery = mapped?.battery ?? pooled?.battery ?? null;
   const lastSeen = mapped?.lastSeen ?? pooled?.lastSeen ?? null;

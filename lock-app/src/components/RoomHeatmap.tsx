@@ -48,7 +48,8 @@ export function RoomHeatmapLegend() {
       <span className="legend-item"><span className="legend-swatch rc-warning" />Occupied · low battery</span>
       <span className="legend-item"><span className="legend-swatch rc-issue" />Occupied · offline</span>
       <span className="legend-item"><span className="legend-swatch rc-vacant" />Vacant</span>
-      <span className="legend-item"><span className="legend-swatch rc-no-lock" />No lock assigned</span>
+      <span className="legend-item"><span className="legend-swatch rc-occupied-no-lock" />Occupied · no lock installed</span>
+      <span className="legend-item"><span className="legend-swatch rc-no-lock" />No lock (vacant)</span>
       <span className="legend-item"><span className="legend-swatch rc-vacant rc-fault-issue" />Ring = lock fault (red offline · orange low batt)</span>
     </div>
   );

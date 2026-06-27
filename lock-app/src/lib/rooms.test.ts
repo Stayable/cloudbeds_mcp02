@@ -49,8 +49,11 @@ describe("toRoomTile", () => {
 });
 
 describe("roomChipStatus (occupancy-first portfolio colors)", () => {
-  it("is black (no-lock) for an unmapped room, even if occupied", () => {
-    expect(roomChipStatus({ mapped: false, occupied: true, online: false, batteryLow: true })).toBe("no-lock");
+  it("is black (no-lock) for an unmapped VACANT room", () => {
+    expect(roomChipStatus({ mapped: false, occupied: false, online: false, batteryLow: true })).toBe("no-lock");
+  });
+  it("is violet (occupied-no-lock) for an unmapped room that is occupied right now", () => {
+    expect(roomChipStatus({ mapped: false, occupied: true, online: false, batteryLow: true })).toBe("occupied-no-lock");
   });
   it("is grey (vacant) for any mapped+vacant room, even when the lock is offline or low", () => {
     expect(roomChipStatus({ mapped: true, occupied: false, online: true, batteryLow: false })).toBe("vacant");

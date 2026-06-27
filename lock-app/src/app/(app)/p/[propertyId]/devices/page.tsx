@@ -23,7 +23,7 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
   const rows: DeviceRow[] = [
     ...mapped.map((l) => ({
       lockId: String(l.lockId),
-      lockName: l.alias?.trim() || `Lock ${l.lockId}`,
+      lockName: l.alias?.trim() || `${property.abbr} ${l.lockId}`,
       roomLabel: l.roomName?.trim() || l.roomId,
       roomId: l.roomId,
       model: l.model ?? null,
@@ -34,7 +34,7 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
     })),
     ...available.map((l) => ({
       lockId: String(l.lockId),
-      lockName: l.name?.trim() || `Lock ${l.lockId}`,
+      lockName: l.name?.trim() || `${property.abbr} ${l.lockId}`,
       roomLabel: "—",
       roomId: null,
       model: null,

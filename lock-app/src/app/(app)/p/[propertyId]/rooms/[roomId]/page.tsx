@@ -207,7 +207,7 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                       <option value="" disabled>Pick a lock…</option>
                       {availableLocks.map((l) => (
                         <option key={String(l.lockId)} value={String(l.lockId)}>
-                          Lock {String(l.lockId)}{l.battery != null ? ` · ${l.battery}%` : ""}
+                          {property.abbr} {String(l.lockId)}{l.battery != null ? ` · ${l.battery}%` : ""}
                         </option>
                       ))}
                     </select>

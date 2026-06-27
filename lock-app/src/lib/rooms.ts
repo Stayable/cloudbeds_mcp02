@@ -74,16 +74,17 @@ export function toRoomTile(input: RoomTileInput): RoomTile {
 
 /**
  * A Portfolio room chip carries two independent signals:
- *  - `status` (the FILL) is occupancy-first: no-lock → black, vacant → grey
- *    (always), and only OCCUPIED rooms color by lock health — ok (green) /
- *    warning=low battery (orange) / issue=offline (red). Answers "which GUESTS
- *    are affected right now?".
+ *  - `status` (the FILL) is occupancy-first: no-lock → black (or VIOLET when a
+ *    guest is in a room with no lock installed), vacant → grey (always), and
+ *    only OCCUPIED+mapped rooms color by lock health — ok (green) / warning=low
+ *    battery (orange) / issue=offline (red). Answers "which GUESTS are affected
+ *    right now?".
  *  - `fault` (the RING) is pure lock health on any MAPPED room, regardless of
  *    occupancy: issue=offline / warning=low / null=healthy. This is what makes a
  *    broken lock in a VACANT room visible (grey fill + colored ring) without
  *    diluting the occupied-room red.
  */
-export type ChipStatus = "no-lock" | "vacant" | "ok" | "warning" | "issue";
+export type ChipStatus = "no-lock" | "occupied-no-lock" | "vacant" | "ok" | "warning" | "issue";
 export type ChipFault = "issue" | "warning" | null;
 
 export interface RoomChipInput {
@@ -105,7 +106,9 @@ export interface RoomChip {
 export function roomChipStatus(r: {
   mapped: boolean; occupied: boolean; online: boolean; batteryLow: boolean;
 }): ChipStatus {
-  if (!r.mapped) return "no-lock"; // black — no lock assigned
+  // No lock installed: violet if a guest is in it right now (a flag — occupied
+  // but unmanaged), else black (vacant, just needs onboarding).
+  if (!r.mapped) return r.occupied ? "occupied-no-lock" : "no-lock";
   if (!r.occupied) return "vacant"; // grey — nothing to manage
   if (!r.online) return "issue"; // red — guest's lock is offline
   if (r.batteryLow) return "warning"; // orange — guest's lock low battery
