@@ -80,7 +80,7 @@ async function main() {
     }
 
     console.log(`property ${propertyId}: ${existing.length} existing webhook(s)`);
-    for (const w of existing) console.log(`    • ${w.object}/${w.action} → ${w.endpointUrl ?? "(no url)"}`);
+    for (const w of existing) console.log("    raw:", JSON.stringify(w));
 
     const endpointUrl = process.env.MIDDLEWARE_WEBHOOK_URL?.trim() || existing.find((w) => w.endpointUrl)?.endpointUrl;
     if (!endpointUrl) {
