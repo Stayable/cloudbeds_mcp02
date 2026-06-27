@@ -154,6 +154,11 @@ export class CloudbedsRegistry {
     return new CloudbedsClient({ ...opts, baseUrl: this.baseUrl });
   }
 
+  /** The property IDs that have a per-property key configured (for the poll cron). */
+  propertyIds(): string[] {
+    return [...this.keys.keys()];
+  }
+
   /** Pick the client for a given property, or throw a helpful error. */
   resolve(propertyID?: string): CloudbedsClient {
     if (propertyID && this.keys.has(propertyID)) {
@@ -225,6 +230,29 @@ export async function getReservation(
     .resolve(propertyID)
     .get<ReservationDetail>("getReservation", { propertyID, reservationID });
   return (res.data ?? {}) as ReservationDetail;
+}
+
+/**
+ * List a property's currently checked-in reservations (getReservations,
+ * status=checked_in, includeGuestsDetails so room assignments are inline).
+ * Paginated. Used by the poll-reconcile cron to catch room changes that fire no
+ * webhook we receive.
+ */
+export async function listCheckedInReservations(
+  registry: CloudbedsRegistry,
+  propertyID: string,
+): Promise<ReservationDetail[]> {
+  const client = registry.resolve(propertyID);
+  const out: ReservationDetail[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await client.get<ReservationDetail[]>("getReservations", {
+      propertyID, status: "checked_in", includeGuestsDetails: true, pageNumber: page, pageSize: 100,
+    });
+    const rows = res.data ?? [];
+    out.push(...rows);
+    if (rows.length < 100) break;
+  }
+  return out;
 }
 
 /**

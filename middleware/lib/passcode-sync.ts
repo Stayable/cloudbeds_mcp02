@@ -14,6 +14,7 @@ import {
   CloudbedsRegistry,
   extractRoomIds,
   getReservation,
+  listCheckedInReservations,
   postReservationNote,
   roomNameFor,
 } from "./cloudbeds";
@@ -400,6 +401,83 @@ export async function reconcilePasscodes(
       { propertyId, reservationId, roomId, paidInFull, startTs, endTs },
       result,
     );
+  }
+
+  return result;
+}
+
+/**
+ * Poll-reconcile a property's in-house reservations against their PINs. This is
+ * the catch-up for room changes that fire no webhook we receive (a room-only
+ * change in some accounts emits nothing subscribed): list the checked-in
+ * reservations, and for each — revoke PINs on rooms it has LEFT, create PINs on
+ * the rooms it now occupies (gated: paid + mapped). Conservative on purpose: it
+ * NEVER touches passcodes for a reservation that isn't in the checked-in set
+ * (those are the checkout webhook's job — avoids a partial fetch causing a false
+ * revoke). Idempotent: steady state (no moves) issues only the list reads.
+ */
+export async function reconcileCheckedInReservations(
+  registry: CloudbedsRegistry,
+  propertyId: string,
+): Promise<SyncResult> {
+  const reservations = await listCheckedInReservations(registry, propertyId);
+  const result: SyncResult = {
+    action: "cron_reconcile",
+    roomsConsidered: 0,
+    pinsCreated: 0,
+    pinsRevoked: 0,
+    unmappedRooms: [],
+  };
+
+  // reservationId → { detail, desired rooms } for every checked-in reservation.
+  const byRes = new Map<string, { detail: ReservationDetail; desired: Set<string> }>();
+  for (const detail of reservations) {
+    const rid = detail.reservationID != null ? String(detail.reservationID) : "";
+    if (!rid) continue;
+    byRes.set(rid, { detail, desired: new Set(extractRoomIds(detail)) });
+  }
+  result.roomsConsidered = [...byRes.values()].reduce((n, r) => n + r.desired.size, 0);
+
+  // 1. Revoke stale — only for reservations we KNOW are still checked in but whose
+  //    PIN is on a room they no longer occupy (definitive room change).
+  const active = await prisma.passcode.findMany({ where: { propertyId, status: "active" } });
+  for (const pc of active) {
+    const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
+    if (!entry || entry.desired.has(pc.roomId)) continue;
+    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked" } });
+    result.pinsRevoked++;
+    await prisma.roomState.upsert({
+      where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
+      create: { propertyId: pc.propertyId, roomId: pc.roomId, occupancyStatus: "free" },
+      update: { occupancyStatus: "free", guestName: null, checkoutDate: null, currentReservationId: null },
+    });
+    await prisma.eventLog.create({
+      data: {
+        source: "cron", event: "cron/reconcile", propertyId: pc.propertyId, roomId: pc.roomId, lockId: pc.lockId,
+        action: "passcode_revoked",
+        detail: { reservationId: pc.reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change_poll" },
+      },
+    });
+  }
+
+  // 2. Create missing — for each checked-in reservation's current rooms (gated).
+  const pseudo = { event: "cron/reconcile" } as ReservationWebhookPayload;
+  for (const [reservationId, { detail, desired }] of byRes) {
+    const paidInFull = isPaidInFull(detail.balance);
+    let window: { startTs: number; endTs: number };
+    try {
+      window = validityWindow(detail.startDate, detail.endDate);
+    } catch {
+      continue; // missing/bad dates on this reservation — skip rather than throw the whole cron
+    }
+    for (const roomId of desired) {
+      await createPasscodeForRoom(
+        registry, pseudo, detail,
+        { propertyId, reservationId, roomId, paidInFull, startTs: window.startTs, endTs: window.endTs },
+        result,
+      );
+    }
   }
 
   return result;
