@@ -1,16 +1,20 @@
 "use client";
 import { useFormState, useFormStatus } from "react-dom";
 import { runOccupancySync, type OccupancyState } from "@/app/(app)/occupancy-actions";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const initial: OccupancyState = { ran: false };
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="btn btn-ghost" style={{ height: 34, fontSize: 12 }}>
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M13.5 8a5.5 5.5 0 11-1.6-3.9M13 1.5V5H9.5" /></svg>
-      {pending ? "Syncing…" : label}
-    </button>
+    <>
+      {pending && <LoadingOverlay label="Syncing occupancy from Cloudbeds…" />}
+      <button type="submit" disabled={pending} className="btn btn-ghost" style={{ height: 34, fontSize: 12 }}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M13.5 8a5.5 5.5 0 11-1.6-3.9M13 1.5V5H9.5" /></svg>
+        {pending ? "Syncing…" : label}
+      </button>
+    </>
   );
 }
 
