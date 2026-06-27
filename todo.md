@@ -48,6 +48,29 @@ SHIPPED this session (all deployed via Git auto-deploy — lock-app is now Git-c
 DEFERRED (BK said later): lock-health poll cron (idle-lock online/battery — "Plan 4"); reservation-note
   "replace not append" on room-change (new note posts, old lingers — PIN IS revoked, cosmetic); set CRON_SECRET on
   both Vercel projects (cron auth + manual trigger); roll out webhooks to the other 7 properties.
+
+NEW BACKLOG (2026-06-28 PM, from BK — captured, NOT yet built):
+- [ ] ⭐ **Stay EXTENSION must keep the SAME code (DeviceThread regenerates — bad for our transient/long-term
+      guests who extend daily/weekly).** FINDING (verified passcode-sync.ts:227-230): we already RETAIN the PIN on
+      extend (idempotency guard skips if an active passcode exists for (reservation,room)) → we do NOT mint a new
+      code. **BUG:** we do NOT update the retained PIN's validity window, so it still expires at the ORIGINAL
+      checkout date. FIX: on a date change, UPDATE the existing TTLock passcode's endDate (TTLock keyboardPwd
+      change-period endpoint) + Passcode.endTs — keep the same digits, extend the window. (What event fires on a
+      Cloudbeds date-extension is unconfirmed — check: status_changed vs a modify event; the poll cron could also
+      refresh windows for checked-in reservations.)
+- [ ] **Backup codes: 5 per lock, each with its own rotate.** Rename "Staff backup PIN" → **"Backup PIN
+      (offline)"**. Today there's ONE permanent backup code (BACKUP_PWD_TYPE) + one Rotate. Make it 5 codes, each
+      independently rotatable. Files: room detail page.tsx + actions.ts (rotateBackupCode → per-slot).
+- [ ] **Reveal actions should NOT hit the notification bell.** `code_revealed` / `backup_code_revealed` are logged
+      outcome=warning → currently surface in notifications. Exclude reveal actions from the bell feed (keep them in
+      the Activity log — they're routine admin actions, not alerts). File: lock-app/src/lib/notifications.ts.
+- [ ] **User Logs** — a view of actions taken within the dashboards, per user (EventLog already stores
+      actorUserId/actorEmail/actorRole). CLARIFY w/ BK: dedicated "User Logs" page vs a user filter on the existing
+      Activity page.
+- [ ] **Add/verify users**: kate@rentstayable.com, gerardo@rentstayable.com, rb@rise8companies.com. NOTE: likely
+      ALREADY seeded (seed-users.ts has rb@rise8 + kate@rentstayable; gerardo added prior as super_admin). Verify
+      present in prod Neon; add any missing via seed-users.ts + `npm run db:seed:users` (confirm role per user —
+      super_admin vs scoped; gerardo may want field/on-site scope not super_admin).
 --- earlier 2026-06-28 ---
 RESUME HERE (2026-06-28) — **Guest-details card SHIPPED + all 8 Cloudbeds keys live on lock-app + custom domain added.**
 This session:
