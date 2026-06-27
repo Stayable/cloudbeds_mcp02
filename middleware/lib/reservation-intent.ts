@@ -6,15 +6,36 @@
  * checkout, cancel, no-show, or reservation deletion.
  */
 
-/** Minimal shape of a Cloudbeds reservation webhook payload (it is THIN). */
+/**
+ * Minimal shape of a Cloudbeds reservation webhook payload (it is THIN).
+ * `status_changed`/`deleted` use upper-case `propertyID`/`reservationID`; the
+ * newer `accommodation_*` events use lower-case `propertyId`/`reservationId` and
+ * carry `roomId` (new) + `roomIdPrev` (old). Read both casings via the helpers.
+ */
 export interface ReservationWebhookPayload {
   event: string;
-  propertyID: number | string;
+  propertyID?: number | string;
   propertyID_str?: string;
-  reservationID: string;
+  reservationID?: string;
+  // accommodation_* casing
+  propertyId?: number | string;
+  reservationId?: string;
+  roomId?: string | number;
+  roomIdPrev?: string | number;
+  subReservationId?: string | number;
   startDate?: string;
   endDate?: string;
   status?: string;
+}
+
+/** Canonical reservation id, tolerating both payload casings. */
+export function reservationIdOf(p: ReservationWebhookPayload): string {
+  return String(p.reservationID ?? p.reservationId ?? "");
+}
+
+/** Canonical property id, tolerating both payload casings. */
+export function propertyIdOf(p: ReservationWebhookPayload): string {
+  return String(p.propertyID ?? p.propertyId ?? "");
 }
 
 /** Statuses (or events) that mean any issued code must be revoked. */
@@ -30,17 +51,43 @@ const REMOVED_STATUSES = new Set(["canceled", "cancelled", "checked_out", "no_sh
  * checked-in (isCheckedIn) + paid (isPaidInFull). Checkout/cancel/no-show DO
  * change the top-level status, so those (and deleted) revoke directly.
  */
-export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "revoke" | "ignore" {
+export function classifyIntent(payload: ReservationWebhookPayload): "ensure" | "revoke" | "ignore" | "reconcile" {
   const event = payload.event ?? "";
   if (event.includes("deleted")) return "revoke";
 
   const status = (payload.status ?? "").toLowerCase();
   if (status && REMOVED_STATUSES.has(status)) return "revoke";
 
+  // Room reassignment / room dropped from a multi-room reservation: converge the
+  // reservation's CURRENT rooms (revoke rooms it left, create rooms it gained).
+  // `accommodation_type_changed` (type only, no unit move) deliberately falls
+  // through to ignore.
+  if (event.includes("accommodation_changed") || event.includes("accommodation_removed")) return "reconcile";
+
   if (event.includes("status_changed")) return "ensure";
 
   // Bookings (created) and everything else: do nothing until a status change.
   return "ignore";
+}
+
+/**
+ * The set of rooms a reservation SHOULD have a code on after a room-change event:
+ * the rooms read from the reservation, corrected by the payload hints (which beat
+ * getReservation read-lag). For `accommodation_changed`, `roomId` is the new room
+ * (include) and `roomIdPrev` the old (exclude); for `accommodation_removed`,
+ * `roomId` is the dropped room (exclude).
+ */
+export function reconcileDesiredRooms(extracted: string[], payload: ReservationWebhookPayload): string[] {
+  const desired = new Set(extracted.map(String));
+  const removed = (payload.event ?? "").includes("accommodation_removed");
+  const prev = payload.roomIdPrev != null ? String(payload.roomIdPrev) : "";
+  const room = payload.roomId != null ? String(payload.roomId) : "";
+  if (prev) desired.delete(prev);
+  if (room) {
+    if (removed) desired.delete(room);
+    else desired.add(room);
+  }
+  return [...desired];
 }
 
 /**

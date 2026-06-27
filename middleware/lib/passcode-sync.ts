@@ -21,14 +21,20 @@ import { createPasscode, deletePasscode } from "./ttlock";
 import {
   classifyIntent,
   reservationNoteBody,
+  reconcileDesiredRooms,
+  reservationIdOf,
+  propertyIdOf,
   isPaidInFull,
   isCheckedIn,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
 // Re-exported so existing importers (the webhook route) keep working.
-export { classifyIntent };
+export { classifyIntent, reservationIdOf, propertyIdOf };
 export type { ReservationWebhookPayload };
+
+/** Reservation detail shape used by the create/reconcile paths. */
+type ReservationDetail = Awaited<ReturnType<typeof getReservation>>;
 
 export interface SyncResult {
   action: string;
@@ -72,8 +78,8 @@ export async function ensurePasscodes(
   registry: CloudbedsRegistry,
   payload: ReservationWebhookPayload,
 ): Promise<SyncResult> {
-  const propertyId = String(payload.propertyID);
-  const reservationId = payload.reservationID;
+  const propertyId = propertyIdOf(payload);
+  const reservationId = reservationIdOf(payload);
 
   // Trust the webhook payload's status when it already says checked-in (no read lag).
   const payloadCheckedIn = (payload.status ?? "").toLowerCase() === "checked_in";
@@ -117,144 +123,150 @@ export async function ensurePasscodes(
   );
 
   for (const roomId of roomIds) {
-    // Reflect occupancy + guest on the room so the lock-app shows guest details
-    // (independent of whether the room is mapped to a lock).
-    const occupancy = {
-      occupancyStatus: "occupied",
-      guestName: detail.guestName ?? null,
-      checkoutDate: detail.endDate ?? payload.endDate ?? null,
-      currentReservationId: reservationId,
-    };
-    await prisma.roomState.upsert({
-      where: { propertyId_roomId: { propertyId, roomId } },
-      create: { propertyId, roomId, ...occupancy },
-      update: occupancy,
-    });
-
-    // Payment gate: checked-in but a balance remains → no code yet. Logged so a
-    // later event (once paid) can re-run and mint it (idempotent).
-    if (!paidInFull) {
-      await prisma.eventLog.create({
-        data: {
-          source: "webhook",
-          event: payload.event,
-          propertyId,
-          roomId,
-          action: "awaiting_payment",
-          detail: { reservationId, balance: detail.balance ?? null },
-        },
-      });
-      continue;
-    }
-
-    const map = await prisma.lockMap.findUnique({
-      where: { propertyId_roomId: { propertyId, roomId } },
-    });
-    if (!map) {
-      result.unmappedRooms.push(roomId);
-      await prisma.eventLog.create({
-        data: {
-          source: "webhook",
-          event: payload.event,
-          propertyId,
-          roomId,
-          action: "no_lock_mapped",
-          detail: { reservationId },
-        },
-      });
-      continue;
-    }
-
-    // Idempotency guard: skip if this (reservation, room) already has a live PIN.
-    const existing = await prisma.passcode.findFirst({
-      where: { reservationId, roomId, status: "active" },
-    });
-    if (existing) continue;
-
-    const pin = generatePin();
-    try {
-      const { keyboardPwdId } = await createPasscode({
-        lockId: map.lockId,
-        passcode: pin,
-        startDate: startTs,
-        endDate: endTs,
-        name: `Res ${reservationId}`,
-      });
-
-      await prisma.passcode.create({
-        data: {
-          reservationId,
-          propertyId,
-          roomId,
-          lockId: map.lockId,
-          keyboardPwdId: BigInt(keyboardPwdId),
-          pin,
-          startTs: BigInt(startTs),
-          endTs: BigInt(endTs),
-          status: "active",
-        },
-      });
-      result.pinsCreated++;
-
-      await prisma.eventLog.create({
-        data: {
-          source: "webhook",
-          event: payload.event,
-          propertyId,
-          roomId,
-          lockId: map.lockId,
-          action: "passcode_created",
-          detail: { reservationId, keyboardPwdId: String(keyboardPwdId) },
-        },
-      });
-
-      // Surface the code on the Cloudbeds reservation as a note. Best-effort: a
-      // note failure must NOT lose the PIN (the row now exists, so a retry would
-      // skip creation and never re-post), so we log it and continue.
-      try {
-        await postReservationNote(
-          registry,
-          propertyId,
-          reservationId,
-          reservationNoteBody({
-            // Lock name (e.g. "LL-239"); fall back to the room if no alias is set.
-            lockName: map.alias?.trim() || roomNameFor(detail, roomId) || roomId,
-            pin,
-          }),
-        );
-        await prisma.eventLog.create({
-          data: {
-            source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
-            action: "reservation_note_posted",
-            detail: { reservationId },
-          },
-        });
-      } catch (noteErr: any) {
-        await prisma.eventLog.create({
-          data: {
-            source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
-            action: "reservation_note_failed",
-            detail: { reservationId, error: noteErr?.message ?? String(noteErr) },
-          },
-        });
-      }
-    } catch (err: any) {
-      await prisma.eventLog.create({
-        data: {
-          source: "webhook",
-          event: payload.event,
-          propertyId,
-          roomId,
-          lockId: map.lockId,
-          action: "passcode_create_failed",
-          detail: { reservationId, error: err?.message ?? String(err) },
-        },
-      });
-      throw err; // surface to the route so Cloudbeds retries
-    }
+    await createPasscodeForRoom(
+      registry, payload, detail,
+      { propertyId, reservationId, roomId, paidInFull, startTs, endTs },
+      result,
+    );
   }
 
   return result;
+}
+
+/**
+ * Create (or skip) the guest PIN for ONE room of a reservation. Shared by the
+ * check-in (`ensurePasscodes`) and room-change (`reconcilePasscodes`) paths so
+ * they can't diverge. Always reflects occupancy first (so the lock-app shows the
+ * guest even on an unmapped room); then gates on paid → mapped → idempotency
+ * before minting. Throws on a TTLock/DB create failure (→ 500 → Cloudbeds retry).
+ */
+async function createPasscodeForRoom(
+  registry: CloudbedsRegistry,
+  payload: ReservationWebhookPayload,
+  detail: ReservationDetail,
+  args: { propertyId: string; reservationId: string; roomId: string; paidInFull: boolean; startTs: number; endTs: number },
+  result: SyncResult,
+): Promise<void> {
+  const { propertyId, reservationId, roomId, paidInFull, startTs, endTs } = args;
+
+  // Reflect occupancy + guest on the room so the lock-app shows guest details
+  // (independent of whether the room is mapped to a lock).
+  const occupancy = {
+    occupancyStatus: "occupied",
+    guestName: detail.guestName ?? null,
+    checkoutDate: detail.endDate ?? payload.endDate ?? null,
+    currentReservationId: reservationId,
+  };
+  await prisma.roomState.upsert({
+    where: { propertyId_roomId: { propertyId, roomId } },
+    create: { propertyId, roomId, ...occupancy },
+    update: occupancy,
+  });
+
+  // Payment gate: checked-in but a balance remains → no code yet. Logged so a
+  // later event (once paid) can re-run and mint it (idempotent).
+  if (!paidInFull) {
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId, roomId,
+        action: "awaiting_payment",
+        detail: { reservationId, balance: detail.balance ?? null },
+      },
+    });
+    return;
+  }
+
+  const map = await prisma.lockMap.findUnique({
+    where: { propertyId_roomId: { propertyId, roomId } },
+  });
+  if (!map) {
+    result.unmappedRooms.push(roomId);
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId, roomId,
+        action: "no_lock_mapped",
+        detail: { reservationId },
+      },
+    });
+    return;
+  }
+
+  // Idempotency guard: skip if this (reservation, room) already has a live PIN.
+  const existing = await prisma.passcode.findFirst({
+    where: { reservationId, roomId, status: "active" },
+  });
+  if (existing) return;
+
+  const pin = generatePin();
+  try {
+    const { keyboardPwdId } = await createPasscode({
+      lockId: map.lockId,
+      passcode: pin,
+      startDate: startTs,
+      endDate: endTs,
+      name: `Res ${reservationId}`,
+    });
+
+    await prisma.passcode.create({
+      data: {
+        reservationId, propertyId, roomId,
+        lockId: map.lockId,
+        keyboardPwdId: BigInt(keyboardPwdId),
+        pin,
+        startTs: BigInt(startTs),
+        endTs: BigInt(endTs),
+        status: "active",
+      },
+    });
+    result.pinsCreated++;
+
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+        action: "passcode_created",
+        detail: { reservationId, keyboardPwdId: String(keyboardPwdId) },
+      },
+    });
+
+    // Surface the code on the Cloudbeds reservation as a note. Best-effort: a
+    // note failure must NOT lose the PIN (the row now exists, so a retry would
+    // skip creation and never re-post), so we log it and continue.
+    try {
+      await postReservationNote(
+        registry,
+        propertyId,
+        reservationId,
+        reservationNoteBody({
+          lockName: map.alias?.trim() || roomNameFor(detail, roomId) || roomId,
+          pin,
+        }),
+      );
+      await prisma.eventLog.create({
+        data: {
+          source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+          action: "reservation_note_posted",
+          detail: { reservationId },
+        },
+      });
+    } catch (noteErr: any) {
+      await prisma.eventLog.create({
+        data: {
+          source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+          action: "reservation_note_failed",
+          detail: { reservationId, error: noteErr?.message ?? String(noteErr) },
+        },
+      });
+    }
+  } catch (err: any) {
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+        action: "passcode_create_failed",
+        detail: { reservationId, error: err?.message ?? String(err) },
+      },
+    });
+    throw err; // surface to the route so Cloudbeds retries
+  }
 }
 
 /**
@@ -304,6 +316,81 @@ export async function revokePasscodes(
         detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId) },
       },
     });
+  }
+
+  return result;
+}
+
+/**
+ * Converge a reservation's PINs onto its CURRENT rooms after a room change
+ * (`accommodation_changed` / `accommodation_removed`): revoke PINs on rooms the
+ * reservation has left (UNCONDITIONAL — the old code must die the moment the
+ * guest leaves), and create PINs on rooms it now occupies (gated: checked-in +
+ * paid + mapped). Idempotent + self-healing: a redelivery re-derives the same
+ * desired set, finds stale already revoked and desired already created → no-op.
+ */
+export async function reconcilePasscodes(
+  registry: CloudbedsRegistry,
+  payload: ReservationWebhookPayload,
+): Promise<SyncResult> {
+  const propertyId = propertyIdOf(payload);
+  const reservationId = reservationIdOf(payload);
+  const detail = await getReservation(registry, propertyId, reservationId);
+  // Desired rooms = what the reservation reads as, corrected by payload hints
+  // (which beat getReservation read-lag).
+  const desired = reconcileDesiredRooms(extractRoomIds(detail), payload);
+  const desiredSet = new Set(desired);
+
+  const result: SyncResult = {
+    action: "reconcile",
+    roomsConsidered: desired.length,
+    pinsCreated: 0,
+    pinsRevoked: 0,
+    unmappedRooms: [],
+  };
+
+  // 1. Revoke stale — active PINs for this reservation on rooms it no longer
+  //    occupies. Runs even if the new room is unmapped (the old code must die).
+  const active = await prisma.passcode.findMany({ where: { reservationId, status: "active" } });
+  for (const pc of active) {
+    if (desiredSet.has(pc.roomId)) continue;
+    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked" } });
+    result.pinsRevoked++;
+    await prisma.roomState.upsert({
+      where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
+      create: { propertyId: pc.propertyId, roomId: pc.roomId, occupancyStatus: "free" },
+      update: { occupancyStatus: "free", guestName: null, checkoutDate: null, currentReservationId: null },
+    });
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId: pc.propertyId, roomId: pc.roomId, lockId: pc.lockId,
+        action: "passcode_revoked",
+        detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change" },
+      },
+    });
+  }
+
+  // 2. Create missing — gated. A move of a not-yet-checked-in reservation just
+  //    leaves no codes (occupancy still moves once they check in via `ensure`).
+  if (!isCheckedIn(detail)) {
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId,
+        action: "awaiting_checkin",
+        detail: { reservationId, status: detail.status ?? null },
+      },
+    });
+    return result;
+  }
+  const paidInFull = isPaidInFull(detail.balance);
+  const { startTs, endTs } = validityWindow(detail.startDate ?? payload.startDate, detail.endDate ?? payload.endDate);
+  for (const roomId of desired) {
+    await createPasscodeForRoom(
+      registry, payload, detail,
+      { propertyId, reservationId, roomId, paidInFull, startTs, endTs },
+      result,
+    );
   }
 
   return result;

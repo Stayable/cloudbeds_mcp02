@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn } from "./reservation-intent";
+import {
+  classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn,
+  reconcileDesiredRooms, reservationIdOf, propertyIdOf,
+} from "./reservation-intent";
 
 describe("classifyIntent", () => {
   // Cloudbeds check-in lives in guestStatus, and the status_changed payload's
@@ -22,6 +25,43 @@ describe("classifyIntent", () => {
 
   it("revokes on reservation deletion", () => {
     expect(classifyIntent({ event: "reservation/deleted", propertyID: 1, reservationID: "r" })).toBe("revoke");
+  });
+
+  it("reconciles on a room change / room removal", () => {
+    expect(classifyIntent({ event: "reservation/accommodation_changed", propertyId: 1, reservationId: "r", roomId: "b", roomIdPrev: "a" })).toBe("reconcile");
+    expect(classifyIntent({ event: "reservation/accommodation_removed", propertyId: 1, reservationId: "r", roomId: "a" })).toBe("reconcile");
+  });
+
+  it("ignores a room-TYPE change (no unit move)", () => {
+    expect(classifyIntent({ event: "reservation/accommodation_type_changed", propertyId: 1, reservationId: "r" })).toBe("ignore");
+  });
+});
+
+describe("payload casing helpers", () => {
+  it("reads upper-case status_changed and lower-case accommodation casings", () => {
+    expect(reservationIdOf({ event: "x", reservationID: "R1" })).toBe("R1");
+    expect(reservationIdOf({ event: "x", reservationId: "R2" })).toBe("R2");
+    expect(propertyIdOf({ event: "x", propertyID: 206628 })).toBe("206628");
+    expect(propertyIdOf({ event: "x", propertyId: 210972 })).toBe("210972");
+  });
+});
+
+describe("reconcileDesiredRooms", () => {
+  it("on a room change: includes the new room (roomId), excludes the old (roomIdPrev)", () => {
+    // getReservation may lag and still report the old room "a"; hints correct it.
+    const out = reconcileDesiredRooms(["a"], { event: "reservation/accommodation_changed", roomId: "b", roomIdPrev: "a" });
+    expect(out.sort()).toEqual(["b"]);
+  });
+  it("keeps other rooms of a multi-room reservation, swapping only the changed one", () => {
+    const out = reconcileDesiredRooms(["a", "c"], { event: "reservation/accommodation_changed", roomId: "b", roomIdPrev: "a" });
+    expect(out.sort()).toEqual(["b", "c"]);
+  });
+  it("on a room removal: excludes the dropped room (roomId)", () => {
+    const out = reconcileDesiredRooms(["a", "b"], { event: "reservation/accommodation_removed", roomId: "b" });
+    expect(out.sort()).toEqual(["a"]);
+  });
+  it("no hints → just the extracted rooms (deduped, stringified)", () => {
+    expect(reconcileDesiredRooms(["a", "a", "b"], { event: "reservation/accommodation_changed" }).sort()).toEqual(["a", "b"]);
   });
 });
 

@@ -4,6 +4,9 @@ import {
   classifyIntent,
   ensurePasscodes,
   revokePasscodes,
+  reconcilePasscodes,
+  reservationIdOf,
+  propertyIdOf,
   type ReservationWebhookPayload,
 } from "@/lib/passcode-sync";
 import { prisma } from "@/lib/db";
@@ -40,7 +43,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "invalid JSON" }, { status: 400 });
   }
 
-  if (!payload?.event || payload.propertyID == null || !payload.reservationID) {
+  // Both payload casings: status_changed/deleted use propertyID/reservationID;
+  // accommodation_* use propertyId/reservationId.
+  const reservationId = reservationIdOf(payload);
+  const propertyId = propertyIdOf(payload);
+  if (!payload?.event || !propertyId || !reservationId) {
     return Response.json(
       { ok: false, error: "missing event/propertyID/reservationID" },
       { status: 400 },
@@ -54,9 +61,9 @@ export async function POST(req: Request) {
       data: {
         source: "webhook",
         event: payload.event,
-        propertyId: String(payload.propertyID),
+        propertyId,
         action: "ignored",
-        detail: { reservationId: payload.reservationID, status: payload.status ?? null },
+        detail: { reservationId, status: payload.status ?? null },
       },
     });
     return Response.json({ ok: true, intent, handled: false });
@@ -65,10 +72,13 @@ export async function POST(req: Request) {
   // 3. Act. A failure here (Cloudbeds/TTLock/DB hiccup) is transient → 500 so
   //    Cloudbeds retries; the sync layer is idempotent, so a retry is safe.
   try {
+    const registry = CloudbedsRegistry.fromEnv();
     const result =
       intent === "revoke"
-        ? await revokePasscodes(payload.reservationID, payload.event)
-        : await ensurePasscodes(CloudbedsRegistry.fromEnv(), payload);
+        ? await revokePasscodes(reservationId, payload.event)
+        : intent === "reconcile"
+          ? await reconcilePasscodes(registry, payload)
+          : await ensurePasscodes(registry, payload);
 
     return Response.json({ ok: true, intent, result });
   } catch (err: any) {
@@ -77,9 +87,9 @@ export async function POST(req: Request) {
         data: {
           source: "webhook",
           event: payload.event,
-          propertyId: String(payload.propertyID),
+          propertyId,
           action: "webhook_error",
-          detail: { reservationId: payload.reservationID, error: err?.message ?? String(err) },
+          detail: { reservationId, error: err?.message ?? String(err) },
         },
       })
       .catch(() => {}); // never let logging mask the original error
