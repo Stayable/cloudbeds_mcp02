@@ -74,8 +74,8 @@ export function toRoomTile(input: RoomTileInput): RoomTile {
 
 /**
  * A Portfolio room chip carries two independent signals:
- *  - `status` (the FILL) is occupancy-first: no-lock → black (or VIOLET when a
- *    guest is in a room with no lock installed), vacant → grey (always), and
+ *  - `status` (the FILL) is occupancy-first: no-lock → black (or LIGHT BLUE when
+ *    a guest is in a room with no lock installed), vacant → grey (always), and
  *    only OCCUPIED+mapped rooms color by lock health — ok (green) / warning=low
  *    battery (orange) / issue=offline (red). Answers "which GUESTS are affected
  *    right now?".
@@ -106,8 +106,8 @@ export interface RoomChip {
 export function roomChipStatus(r: {
   mapped: boolean; occupied: boolean; online: boolean; batteryLow: boolean;
 }): ChipStatus {
-  // No lock installed: violet if a guest is in it right now (a flag — occupied
-  // but unmanaged), else black (vacant, just needs onboarding).
+  // No lock installed: light blue if a guest is in it right now (a flag —
+  // occupied but unmanaged), else black (vacant, just needs onboarding).
   if (!r.mapped) return r.occupied ? "occupied-no-lock" : "no-lock";
   if (!r.occupied) return "vacant"; // grey — nothing to manage
   if (!r.online) return "issue"; // red — guest's lock is offline
