@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { buildDashboard, type Occupancy } from "@/lib/dashboard";
+import { buildRoomChips, type RoomChipInput } from "@/lib/rooms";
+import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
+import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
 import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
@@ -15,16 +18,35 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
   if (!property) return <Forbidden what="this property" />;
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [locks, states, guestPins, doorEvents] = await Promise.all([
+  const registry = CloudbedsRegistry.fromEnv();
+  const [locks, states, guestPins, doorEvents, cbRooms] = await Promise.all([
     prisma.lockMap.findMany({ where: { propertyId }, select: { roomId: true, roomName: true, online: true, battery: true } }),
     prisma.roomState.findMany({ where: { propertyId }, select: { roomId: true, occupancyStatus: true } }),
     prisma.passcode.findMany({ where: { propertyId, status: "active", type: "guest" }, select: { roomId: true } }),
     prisma.eventLog.findMany({ where: { propertyId, action: "door_left_open", createdAt: { gt: since } }, select: { roomId: true } }),
+    listRooms(registry, propertyId).catch(() => null),
   ]);
 
   // Cloudbeds roomID → human room number, for friendly action labels.
   const roomNameById: Record<string, string> = {};
   for (const l of locks) if (l.roomName) roomNameById[l.roomId] = l.roomName;
+
+  // Full-inventory room heatmap (same chips as the Portfolio squares, but labeled
+  // + clickable). Mapped locks unioned with Cloudbeds rooms; degrades to mapped
+  // -only if no CB key / the call fails.
+  const occByRoom = new Map(states.map((s) => [s.roomId, s.occupancyStatus as Occupancy]));
+  const mappedIds = new Set(locks.map((l) => l.roomId));
+  const chipInputs: RoomChipInput[] = [
+    ...locks.map((l) => ({
+      roomId: l.roomId, roomName: l.roomName, mapped: true, online: l.online, battery: l.battery,
+      occupancyStatus: occByRoom.get(l.roomId),
+    })),
+    ...(cbRooms ?? []).filter((r) => !mappedIds.has(r.roomID)).map((r) => ({
+      roomId: r.roomID, roomName: r.roomName, mapped: false, online: false, battery: null,
+      occupancyStatus: occByRoom.get(r.roomID),
+    })),
+  ];
+  const roomChips = buildRoomChips(chipInputs);
 
   const { kpis, actions } = buildDashboard({
     locks: locks.map((l) => ({ roomId: l.roomId, online: l.online, battery: l.battery })),
@@ -74,6 +96,21 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--faint)" strokeWidth={1.8} strokeLinecap="round"><path d="M5 3l5 5-5 5" /></svg>
             </Link>
           ))
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+          <span className="card-title">All rooms{roomChips.length ? ` · ${roomChips.length}` : ""}</span>
+          <Link href={`/p/${propertyId}/rooms`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>List view</Link>
+        </div>
+        {roomChips.length === 0 ? (
+          <p className="subtle">No rooms found — check the Cloudbeds key for this property.</p>
+        ) : (
+          <>
+            <RoomHeatmap chips={roomChips} variant="numbered" propertyId={propertyId} />
+            <div style={{ marginTop: 12 }}><RoomHeatmapLegend /></div>
+          </>
         )}
       </div>
     </div>

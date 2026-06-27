@@ -5,6 +5,7 @@ import { getProperty } from "@/lib/properties";
 import { summarizeProperty } from "@/lib/overview";
 import { buildRoomChips, type Occupancy, type RoomChipInput } from "@/lib/rooms";
 import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
+import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
 
 export const dynamic = "force-dynamic";
 
@@ -71,14 +72,7 @@ export default async function PortfolioPage() {
           <p className="subtle" style={{ marginTop: 5 }}>
             {props.length} {props.length === 1 ? "property" : "properties"} · {totalLocks} locks · live status
           </p>
-          <div className="legend">
-            <span className="legend-item"><span className="legend-swatch rc-ok" />Occupied · ok</span>
-            <span className="legend-item"><span className="legend-swatch rc-warning" />Occupied · low battery</span>
-            <span className="legend-item"><span className="legend-swatch rc-issue" />Occupied · offline</span>
-            <span className="legend-item"><span className="legend-swatch rc-vacant" />Vacant</span>
-            <span className="legend-item"><span className="legend-swatch rc-no-lock" />No lock assigned</span>
-            <span className="legend-item"><span className="legend-swatch rc-vacant rc-fault-issue" />Ring = lock fault (red offline · orange low batt)</span>
-          </div>
+          <RoomHeatmapLegend />
         </div>
         <div className="fleet-stats">
           <div className="fleet-stat"><div className="n tnum" style={{ color: "var(--ok)" }}>{totOnline}</div><div className="l">online</div></div>
@@ -116,22 +110,18 @@ export default async function PortfolioPage() {
                   <span className="dot" />{c.needsAttention ? `${c.needsAttention} to fix` : "All clear"}
                 </span>
               </div>
-              {c.chips.length > 0 && (
-                <div className="roomwell" style={{ marginBottom: 14 }}>
-                  {c.chips.map((ch) => (
-                    <span
-                      key={ch.roomId}
-                      className={`roomchip rc-${ch.status}${ch.fault ? ` rc-fault-${ch.fault}` : ""}`}
-                      title={`Room ${ch.label} · ${ch.status}${ch.fault ? ` · lock ${ch.fault === "issue" ? "offline" : "low battery"}` : ""}`}
-                    >{ch.label}</span>
-                  ))}
-                </div>
-              )}
+              <div style={{ marginBottom: 14 }}>
+                <RoomHeatmap chips={c.chips} variant="square" />
+              </div>
               <div className="statgrid">
                 <div className="statmini"><div className="n tnum">{c.online}<span className="den">/{c.totalLocks}</span></div><div className="l"><span className="legend-swatch rc-ok" />ONLINE</div></div>
                 <div className="statmini"><div className="n tnum" style={{ color: c.offline ? "var(--crit-ink)" : "var(--ink)" }}>{c.offline}</div><div className="l"><span className="legend-swatch rc-issue" />OFFLINE</div></div>
                 <div className="statmini"><div className="n tnum" style={{ color: c.lowBattery ? "var(--warn-ink)" : "var(--ink)" }}>{c.lowBattery}</div><div className="l"><span className="legend-swatch rc-warning" />LOW BATT</div></div>
                 <div className="statmini"><div className="n tnum">{c.noLock}</div><div className="l"><span className="legend-swatch rc-no-lock" />NO LOCK</div></div>
+              </div>
+              <div className="card-open-hint">
+                Open dashboard
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M5 3l5 5-5 5" /></svg>
               </div>
             </Link>
           ))}

@@ -217,6 +217,8 @@ a.trow:hover, .trow.clickable:hover { background: var(--row-hover); }
 .prop-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: box-shadow .18s, transform .18s; display: block; }
 .prop-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
 .prop-card:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.card-open-hint { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--divider); font-size: 12px; font-weight: 600; color: var(--muted); transition: color .18s; }
+.prop-card:hover .card-open-hint { color: var(--blue); }
 .abbr-badge { width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--navy); color: var(--gold); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono-stack); font-weight: 600; font-size: 12px; flex: 0 0 auto; }
 .dotwell { display: flex; flex-wrap: wrap; gap: 3px; padding: 10px; background: var(--subtle-bg); border: 1px solid #EEF1F6; border-radius: var(--radius-sm); }
 .dot-sm { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
@@ -225,6 +227,10 @@ a.trow:hover, .trow.clickable:hover { background: var(--row-hover); }
    no-lock=black, vacant=grey, occupied → ok=green / warning=orange / issue=red. */
 .roomwell { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; background: var(--subtle-bg); border: 1px solid #EEF1F6; border-radius: var(--radius-sm); }
 .roomchip { font-family: var(--font-mono-stack); font-size: 11px; font-weight: 600; line-height: 1; min-width: 26px; text-align: center; padding: 4px 5px; border-radius: 5px; color: #fff; }
+a.roomchip { text-decoration: none; transition: transform .08s ease, filter .08s ease; }
+a.roomchip:hover { transform: translateY(-1px); filter: brightness(1.08); }
+/* Small status square (Portfolio cards): color only, no label, not individually clickable. */
+.roomsq { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
 .rc-ok { background: var(--ok); }
 .rc-warning { background: var(--warn); color: #5A3B00; }
 .rc-issue { background: var(--crit); }
