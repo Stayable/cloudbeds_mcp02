@@ -5,6 +5,50 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
+RESUME HERE (2026-06-28 PM) — **Room-change reconciliation BUILT + big lock-app UI/occupancy pass. All committed+pushed (origin even); auto-deploys live.** Branch tip: 72675a0.
+GATING THE ROOM-CHANGE TEST (do in order):
+  1. ⭐🔴 **Gerardo: get the 239 lock (Cloudbeds roomID 405761-25) onto a TTLock gateway / online.** It's
+     disconnected → TTLock errcode **-2012 "not connected to any Gateway"** → PIN create fails there. (405761-40
+     works, has gateway.) Verify on Devices: 405761-25 should flip from offline once reachable.
+  2. 🟡 **Register the accommodation webhooks** (instant room-change path): from `middleware/`, run
+     `npx tsx scripts/register-accommodation-webhooks.ts` (LIST — done, confirmed API) then `--apply`. Script
+     auto-reads lock-app/.env.cloudbeds.local + reuses each account's existing endpointUrl.
+  3. 🟡 **Test the move**: change a reservation's room in Cloudbeds → event log should show
+     `passcode_revoked (room_change)` on old room + `passcode_created` on new. (Or trigger now without webhook:
+     `curl -H "Authorization: Bearer <CRON_SECRET>" https://lock-middleware.vercel.app/api/cron/reconcile`.)
+KEY FINDINGS this session:
+  • **Room change fires NO subscribed webhook** for these accounts — only `status_changed` is ever received.
+    `accommodation_changed`/`removed` are NOT subscribed → never reach us. (Built handler + poll-cron + reg script.)
+  • **Only Lakeland (210972) has ANY webhooks** (status_changed + deleted). Other 7 properties have ZERO — not
+    wired for anything yet (separate rollout). getWebhooks shape = `event.{entity,action}` + `subscriptionData.url`;
+    owner = the per-property api_client. Receiver URL = `https://lock-middleware.vercel.app/api/cloudbeds-webhook?token=0e2ee408…`.
+  • **Vercel Hobby blocks sub-daily crons** → froze lock-app deploys 45 min until cron set DAILY. Both crons
+    (occupancy `0 4 * * *`, reconcile `0 5 * * *`) are DAILY until the team is on **Pro** (then bump to ~every few min).
+  • **MCP server (cloudbeds-mcp02) keys still all revoked** — the Cloudbeds MCP tools in-session are dead; refresh
+    those env vars + redeploy if MCP needed. (lock-app + middleware keys are fine.)
+  • Resend $20/mo approved (per BK; not logged).
+SHIPPED this session (all deployed via Git auto-deploy — lock-app is now Git-connected, Root Dir `lock-app`):
+  LOCK-APP: full-inventory Rooms list (Cloudbeds getRooms union, "No lock assigned" pill+filter); Portfolio
+  small status SQUARES (occupancy-first colors + lock-fault ring) + mini status-count cards, whole card → Dashboard;
+  Dashboard "All rooms" numbered heatmap (clickable) + "Needs attention" ACCORDION below it + room-NUMBER labels
+  (was roomID) + dropped dead "View all→alerts"; heatmap colors = black no-lock / grey vacant / green-orange-red
+  occupied-by-health / **light-blue (#38BDF8) "occupied · no lock installed"**; **Occupancy rehydrate**: "Sync
+  occupancy" button (Portfolio all + Dashboard per-prop) + daily cron + `lib/occupancy-sync.ts` (rate-limit-safe:
+  sequential + includeGuestsDetails + retry); full-screen **loading overlay**; **MOVE-A-LOCK flow**: unmap renames
+  lock → `<ABBR> (unassigned)` + pools it (sticky — discovery won't re-grab), room-page **assign-lock dropdown**,
+  Devices revamp (all locks incl. available, Lock Name + **TTLock-name** cols, filter/sort, clickable) + new
+  **/devices/[lockId]** lock-detail (status + assign-room dropdown), shared `app/(app)/lock-actions.ts`; Unassigned
+  defaults property from lock name; `<ABBR> <lockId>` labels.
+  MIDDLEWARE: **room-change reconciliation** (`reconcilePasscodes` for accommodation_changed/removed — revoke old
+  room PIN, create new, move occupancy; classifyIntent "reconcile" + dual payload casing); **poll-reconcile cron**
+  `/api/cron/reconcile` (catch-up, no webhook needed); **un-check-in revokes** the code (checked_in→confirmed);
+  **4-digit PINs** (was 6, future codes only); **occupancy freed by currentReservationId** independent of passcode
+  (fixed rooms stuck green); **PIN-create failure handler** → posts Cloudbeds note + marks lock **offline** (red +
+  Needs-attention) on -2012 + skips retries, success → online=true; **webhook reg script**.
+DEFERRED (BK said later): lock-health poll cron (idle-lock online/battery — "Plan 4"); reservation-note
+  "replace not append" on room-change (new note posts, old lingers — PIN IS revoked, cosmetic); set CRON_SECRET on
+  both Vercel projects (cron auth + manual trigger); roll out webhooks to the other 7 properties.
+--- earlier 2026-06-28 ---
 RESUME HERE (2026-06-28) — **Guest-details card SHIPPED + all 8 Cloudbeds keys live on lock-app + custom domain added.**
 This session:
 • ✅ **Guest details card on room detail page** (spec+plan+subagent-driven build, commits 0a6d04f..f1dd341,
