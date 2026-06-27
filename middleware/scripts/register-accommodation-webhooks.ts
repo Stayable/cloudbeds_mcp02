@@ -24,7 +24,17 @@ import { readFileSync } from "node:fs";
 import { CloudbedsRegistry } from "../lib/cloudbeds";
 
 // --- tiny .env loader (so `npx tsx` works without dotenv installed) ----------
-for (const file of [".env.local", ".env"]) {
+// The per-property CLOUDBEDS_API_KEY_<id> keys live in lock-app/.env.cloudbeds.local;
+// also read the middleware's own env, and accept --env=<path> to override.
+const envOverride = process.argv.find((a) => a.startsWith("--env="))?.slice("--env=".length);
+const ENV_FILES = [
+  envOverride,
+  process.env.ENV_FILE,
+  ".env.local",
+  ".env",
+  "../lock-app/.env.cloudbeds.local",
+].filter((f): f is string => !!f);
+for (const file of ENV_FILES) {
   try {
     for (const line of readFileSync(file, "utf8").split("\n")) {
       const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
