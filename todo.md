@@ -5,7 +5,29 @@ Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
-RESUME HERE (2026-06-27 PM) — **Assign-room is now a Cloudbeds ROOM DROPDOWN (no free text).**
+RESUME HERE (2026-06-28) — **Guest-details card SHIPPED + all 8 Cloudbeds keys live on lock-app + custom domain added.**
+This session:
+• ✅ **Guest details card on room detail page** (spec+plan+subagent-driven build, commits 0a6d04f..f1dd341,
+  pushed + deployed prod). Live-fetches name/email/phone/room#/lease-start/end from Cloudbeds when a room is
+  occupied (getReservation + getGuest), pure `toGuestDetails` mapper, try/catch loader that NEVER breaks the
+  page, graceful "contact unavailable" fallback when no key/error. Visible to rooms.view. 106/106 tests.
+  Final opus review caught + fixed: defensive Cloudbeds field names (guestEmail/guestPhone/guestCellPhone +
+  legacy), AbortSignal.timeout(6000) on client fetch, cellPhone-over-landline precedence.
+  Files: lock-app/src/lib/{guest-details,guest-loader}.ts + cloudbeds.ts (getReservation/getGuest) + room
+  detail page.tsx. Spec: docs/superpowers/specs/2026-06-27-lock-app-guest-details-design.md. Plan:
+  docs/superpowers/plans/2026-06-27-lock-app-guest-details.md.
+• ✅ **All 8 per-property Cloudbeds keys added to lock-app Vercel** (Preview+Production) → every property's
+  room dropdown + guest card now works. Keys also in lock-app/.env.cloudbeds.local (GITIGNORED) +
+  .env.example documents the slots. Uniform 4-scope keys: Room R, Reservation R+W, Guest R.
+• ✅ **Lakeland key regenerated/rotated** (uniform scopes) → updated in BOTH lock-middleware + lock-app +
+  local; redeployed both. Knocks out the old "rotate Lakeland cbat_ key" todo.
+• ✅ Custom domain **lock.rentstayable.com** added to lock-app (SSL generating — completes on DNS validate;
+  domain managed outside this Vercel team so `vercel domains inspect` 403s — harmless, attached as alias).
+⭐ VERIFY LIVE NEXT SESSION (sandbox can't reach Cloudbeds): open occupied **Lakeland Room 239** on the
+  deployed app → confirm Guest card shows email+phone (not "—"). If empty but guest has them in CB, capture
+  the real getGuest response shape + adjust field mapping. Also test the assign-room DROPDOWN end-to-end.
+--- earlier 2026-06-27 ---
+RESUME (2026-06-27 PM) — **Assign-room is now a Cloudbeds ROOM DROPDOWN (no free text).**
 • ✅ Unassigned-queue assign: room is now a cascading dropdown of the property's REAL Cloudbeds
   rooms (`/api/rooms?propertyId=`), value = roomID → matched automatically; can't pick a room that
   doesn't exist. Property-first, then rooms load. No key → select disabled w/ "add CLOUDBEDS_API_KEY_<id>"
