@@ -45,7 +45,7 @@ export interface SyncResult {
 }
 
 /** PIN length for guest door codes (TTLock supports 4–9 digits). */
-const PIN_LENGTH = 6;
+const PIN_LENGTH = 4;
 
 function generatePin(): string {
   // crypto.randomInt is uniform and avoids Math.random bias for credentials.
@@ -104,8 +104,17 @@ export async function ensurePasscodes(
     unmappedRooms: [],
   };
 
-  // status_changed fires on many edits; only act once the guest is in-house.
+  // status_changed fires on many edits; only mint codes once the guest is
+  // in-house. If the reservation is NOT checked in but already HAS active codes,
+  // the check-in was reversed (e.g. checked_in → confirmed) — pull the codes so
+  // the invariant "a live code ⇒ checked-in" holds. (Checkout/cancel/no_show go
+  // straight to revoke via classifyIntent; this catches the in-between reversals.)
   if (!checkedIn) {
+    const active = await prisma.passcode.findFirst({ where: { reservationId, status: "active" } });
+    if (active) {
+      const revoked = await revokePasscodes(reservationId, payload.event);
+      return { ...revoked, action: "ensure_revoked_uncheckedin" };
+    }
     await prisma.eventLog.create({
       data: {
         source: "webhook", event: payload.event, propertyId,

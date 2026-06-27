@@ -5,7 +5,7 @@
  */
 import { randomInt } from "node:crypto";
 
-export const PIN_LENGTH = 6;
+export const PIN_LENGTH = 4;
 /** TTLock keyboardPwdType: 3 = period (guest/manual), 2 = permanent (staff backup). */
 export const PERIOD_PWD_TYPE = 3 as const;
 export const BACKUP_PWD_TYPE = 2 as const;
