@@ -91,6 +91,24 @@ export async function listLocks(pageNo = 1, pageSize = 100): Promise<{ total: nu
 }
 
 /**
+ * Live map of lockId → current display name in the TTLock app (lockAlias, or
+ * lockName as fallback). Paginates the whole account. Used by the Devices table
+ * to show the real current name so the operator can match it against the app and
+ * spot drift (a lock renamed directly in TTLock since the last discovery sync).
+ */
+export async function listAllLockNames(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (let pageNo = 1; pageNo <= 30; pageNo++) {
+    const { total, list } = await listLocks(pageNo, 100);
+    for (const l of list) {
+      if (l?.lockId != null) out.set(String(l.lockId), String(l.lockAlias ?? l.lockName ?? "").trim());
+    }
+    if (list.length === 0 || out.size >= total) break;
+  }
+  return out;
+}
+
+/**
  * Rename a lock in the TTLock account (sets lockAlias). Used by the lock-app to
  * apply the <ABBR>-<room> convention from the Unassigned queue so the TTLock name
  * stays the source of truth — no need to open the TTLock app.

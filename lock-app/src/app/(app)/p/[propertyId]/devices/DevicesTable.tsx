@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 export interface DeviceRow {
   lockId: string;
   lockName: string;
+  ttlockName: string | null;
   roomLabel: string;
   roomId: string | null;
   model: string | null;
@@ -14,15 +15,16 @@ export interface DeviceRow {
   status: "mapped" | "available";
 }
 
-type SortKey = "room" | "lockName" | "lockId" | "battery" | "status";
+type SortKey = "room" | "lockName" | "ttlock" | "lockId" | "battery" | "status";
 type HealthFilter = "all" | "online" | "offline" | "low" | "unassigned";
 
-const COLS = "1.1fr 1.4fr 1fr .8fr .9fr 1fr";
+const COLS = "1fr 1.2fr 1.3fr .9fr .8fr .8fr 1fr";
 
 function cmp(a: DeviceRow, b: DeviceRow, key: SortKey): number {
   switch (key) {
     case "room": return a.roomLabel.localeCompare(b.roomLabel, undefined, { numeric: true });
     case "lockName": return a.lockName.localeCompare(b.lockName, undefined, { numeric: true });
+    case "ttlock": return (a.ttlockName ?? "").localeCompare(b.ttlockName ?? "", undefined, { numeric: true });
     case "lockId": return a.lockId.localeCompare(b.lockId, undefined, { numeric: true });
     case "battery": return (a.battery ?? -1) - (b.battery ?? -1);
     case "status": return a.status.localeCompare(b.status);
@@ -39,7 +41,7 @@ export default function DevicesTable({ rows, propertyId }: { rows: DeviceRow[]; 
   const view = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = rows.filter((r) => {
-      if (q && !r.roomLabel.toLowerCase().includes(q) && !r.lockName.toLowerCase().includes(q) && !r.lockId.includes(q)) return false;
+      if (q && !r.roomLabel.toLowerCase().includes(q) && !r.lockName.toLowerCase().includes(q) && !(r.ttlockName ?? "").toLowerCase().includes(q) && !r.lockId.includes(q)) return false;
       switch (health) {
         case "online": return r.online;
         case "offline": return !r.online;
@@ -73,7 +75,7 @@ export default function DevicesTable({ rows, propertyId }: { rows: DeviceRow[]; 
       <div style={{ overflowX: "auto" }}>
         <div className="table-wrap" style={{ minWidth: 780 }}>
           <div className="thead" style={{ display: "grid", gridTemplateColumns: COLS, gap: 12 }}>
-            <Th k="room">ROOM</Th><Th k="lockName">LOCK NAME</Th><Th k="lockId">LOCK ID</Th><Th k="status">STATUS</Th><Th k="battery">BATTERY</Th>
+            <Th k="room">ROOM</Th><Th k="lockName">LOCK NAME</Th><Th k="ttlock">TTLOCK NAME</Th><Th k="lockId">LOCK ID</Th><Th k="status">STATUS</Th><Th k="battery">BATTERY</Th>
             <span style={{ textAlign: "right" }}>ONLINE · SEEN</span>
           </div>
           {view.map((r) => {
@@ -87,6 +89,7 @@ export default function DevicesTable({ rows, propertyId }: { rows: DeviceRow[]; 
               >
                 <span className="mono" style={{ fontWeight: 600, color: "var(--ink)" }}>{r.roomLabel}</span>
                 <span style={{ fontSize: 13, color: "var(--ink-2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.lockName}</span>
+                <span className="mono" style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.ttlockName || "—"}</span>
                 <span className="mono" style={{ fontSize: 13, color: "var(--muted)" }}>{r.lockId}</span>
                 <span><span className={`pill ${r.status === "available" ? "pill-muted" : "pill-ok"}`} style={{ padding: "3px 8px" }}>{r.status === "available" ? "unassigned" : "assigned"}</span></span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}>

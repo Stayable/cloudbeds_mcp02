@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { unassignedLockName } from "@/lib/lock-naming";
+import { listAllLockNames } from "@/lib/ttlock";
 import Forbidden from "@/components/Forbidden";
 import DevicesTable, { type DeviceRow } from "./DevicesTable";
 
@@ -15,15 +16,23 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
   if (!property) return <Forbidden what="this property" />;
 
   const poolName = unassignedLockName(propertyId);
-  const [mapped, available] = await Promise.all([
+  const [mapped, available, ttlockNames] = await Promise.all([
     prisma.lockMap.findMany({ where: { propertyId }, orderBy: { roomId: "asc" } }),
     poolName ? prisma.unassignedLock.findMany({ where: { name: poolName }, orderBy: { lockId: "asc" } }) : Promise.resolve([]),
+    // Live current names from the TTLock app, to match against / spot drift.
+    // Degrades to the stored name if TTLock is unreachable.
+    listAllLockNames().catch(() => new Map<string, string>()),
   ]);
+  const liveName = (lockId: string, stored: string | null) => {
+    const live = ttlockNames.get(lockId);
+    return (live && live.length > 0 ? live : null) ?? stored;
+  };
 
   const rows: DeviceRow[] = [
     ...mapped.map((l) => ({
       lockId: String(l.lockId),
       lockName: l.alias?.trim() || `${property.abbr} ${l.lockId}`,
+      ttlockName: liveName(String(l.lockId), l.alias?.trim() || null),
       roomLabel: l.roomName?.trim() || l.roomId,
       roomId: l.roomId,
       model: l.model ?? null,
@@ -35,6 +44,7 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
     ...available.map((l) => ({
       lockId: String(l.lockId),
       lockName: l.name?.trim() || `${property.abbr} ${l.lockId}`,
+      ttlockName: liveName(String(l.lockId), l.name?.trim() || null),
       roomLabel: "—",
       roomId: null,
       model: null,

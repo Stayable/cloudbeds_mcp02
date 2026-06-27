@@ -236,7 +236,7 @@ a.roomchip:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .rc-issue { background: var(--crit); }
 .rc-vacant { background: #E3E8EF; color: var(--muted); }
 .rc-no-lock { background: #141B27; }
-.rc-occupied-no-lock { background: #38BDF8; } /* light blue — occupied right now, no lock installed */
+.rc-occupied-no-lock { background: #38BDF8; color: #08233B; } /* light blue, dark text — occupied right now, no lock installed */
 /* Lock-health RING (occupancy-independent). Inset shadow keeps chip size constant. */
 .rc-fault-issue { box-shadow: inset 0 0 0 2px var(--crit); }
 .rc-fault-warning { box-shadow: inset 0 0 0 2px var(--warn); }
