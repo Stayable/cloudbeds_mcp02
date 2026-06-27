@@ -221,6 +221,28 @@ a.trow:hover, .trow.clickable:hover { background: var(--row-hover); }
 .dotwell { display: flex; flex-wrap: wrap; gap: 3px; padding: 10px; background: var(--subtle-bg); border: 1px solid #EEF1F6; border-radius: var(--radius-sm); }
 .dot-sm { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 .dot-ok { background: var(--ok); } .dot-warn { background: var(--warn); } .dot-crit { background: var(--crit); } .dot-idle { background: #C2CBDA; }
+/* Room-number heatmap chips (Portfolio cards). Occupancy-first colors:
+   no-lock=black, vacant=grey, occupied → ok=green / warning=orange / issue=red. */
+.roomwell { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px; background: var(--subtle-bg); border: 1px solid #EEF1F6; border-radius: var(--radius-sm); }
+.roomchip { font-family: var(--font-mono-stack); font-size: 11px; font-weight: 600; line-height: 1; min-width: 26px; text-align: center; padding: 4px 5px; border-radius: 5px; color: #fff; }
+.rc-ok { background: var(--ok); }
+.rc-warning { background: var(--warn); color: #5A3B00; }
+.rc-issue { background: var(--crit); }
+.rc-vacant { background: #E3E8EF; color: var(--muted); }
+.rc-no-lock { background: #141B27; }
+/* Lock-health RING (occupancy-independent). Inset shadow keeps chip size constant. */
+.rc-fault-issue { box-shadow: inset 0 0 0 2px var(--crit); }
+.rc-fault-warning { box-shadow: inset 0 0 0 2px var(--warn); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--muted); }
+.legend-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+/* Per-card mini status cards: count per true lock status. */
+.statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.statmini { border: 1px solid #EAEEF4; border-radius: var(--radius-sm); padding: 8px 9px; background: var(--surface); }
+.statmini .n { font-family: var(--font-display-stack); font-size: 17px; font-weight: 600; color: var(--ink); }
+.statmini .den { font-size: 11px; font-weight: 500; color: var(--faint); }
+.statmini .l { display: flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 600; color: var(--muted); margin-top: 4px; letter-spacing: .02em; }
+.statmini .legend-swatch { width: 8px; height: 8px; border-radius: 2px; box-shadow: none; }
 .prop-stat .n { font-family: var(--font-display-stack); font-size: 18px; font-weight: 600; color: var(--ink); }
 .prop-stat .l { font-size: 10px; font-weight: 500; color: var(--muted); margin-top: 4px; letter-spacing: .02em; }
 

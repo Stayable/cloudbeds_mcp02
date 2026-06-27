@@ -3,21 +3,57 @@ import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, userProperties, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { summarizeProperty } from "@/lib/overview";
+import { buildRoomChips, type Occupancy, type RoomChipInput } from "@/lib/rooms";
+import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 
 export const dynamic = "force-dynamic";
 
 export default async function PortfolioPage() {
   const user = await requireUserOrRedirect();
   const props = userProperties(user);
-  const locks = await prisma.lockMap.findMany({
-    where: { propertyId: { in: props.map((p) => p.id) } },
-    select: { propertyId: true, online: true, battery: true },
+  const propIds = props.map((p) => p.id);
+
+  // Mapped locks + occupancy from the DB; full room inventory (for "no lock"
+  // chips) from Cloudbeds per property, in parallel. Each CB call degrades to
+  // null on missing key / failure so one property can't break the page.
+  const registry = CloudbedsRegistry.fromEnv();
+  const [locks, states, cbByProp] = await Promise.all([
+    prisma.lockMap.findMany({
+      where: { propertyId: { in: propIds } },
+      select: { propertyId: true, roomId: true, roomName: true, online: true, battery: true },
+    }),
+    prisma.roomState.findMany({
+      where: { propertyId: { in: propIds } },
+      select: { propertyId: true, roomId: true, occupancyStatus: true },
+    }),
+    Promise.all(propIds.map(async (id) => [id, await listRooms(registry, id).catch(() => null)] as const)),
+  ]);
+  const cbRoomsByProp = new Map(cbByProp);
+
+  const cards = props.map((p) => {
+    const pLocks = locks.filter((l) => l.propertyId === p.id);
+    const occByRoom = new Map(states.filter((s) => s.propertyId === p.id).map((s) => [s.roomId, s.occupancyStatus]));
+    const mappedIds = new Set(pLocks.map((l) => l.roomId));
+    const cbRooms = cbRoomsByProp.get(p.id) ?? null;
+
+    const chipInputs: RoomChipInput[] = [
+      ...pLocks.map((l) => ({
+        roomId: l.roomId, roomName: l.roomName, mapped: true, online: l.online, battery: l.battery,
+        occupancyStatus: occByRoom.get(l.roomId) as Occupancy | undefined,
+      })),
+      ...(cbRooms ?? []).filter((r) => !mappedIds.has(r.roomID)).map((r) => ({
+        roomId: r.roomID, roomName: r.roomName, mapped: false, online: false, battery: null,
+        occupancyStatus: occByRoom.get(r.roomID) as Occupancy | undefined,
+      })),
+    ];
+    const chips = buildRoomChips(chipInputs);
+    return {
+      ...summarizeProperty(p, pLocks.map((l) => ({ online: l.online, battery: l.battery }))),
+      abbr: getProperty(p.id)?.abbr ?? "—",
+      chips,
+      noLock: chips.filter((ch) => ch.status === "no-lock").length,
+    };
   });
-  const cards = props.map((p) => ({
-    ...summarizeProperty(p, locks.filter((l) => l.propertyId === p.id).map((l) => ({ online: l.online, battery: l.battery }))),
-    abbr: getProperty(p.id)?.abbr ?? "—",
-    locks: locks.filter((l) => l.propertyId === p.id),
-  }));
 
   const totalLocks = locks.length;
   const totOnline = locks.filter((l) => l.online).length;
@@ -27,12 +63,6 @@ export default async function PortfolioPage() {
   const canDiscover = sessionCan(user, "lock.discover");
   const unassignedCount = canDiscover ? await prisma.unassignedLock.count() : 0;
 
-  function dotClass(l: { online: boolean; battery: number | null }) {
-    if (!l.online) return "dot-sm dot-crit";
-    if (l.battery != null && l.battery < 20) return "dot-sm dot-warn";
-    return "dot-sm dot-ok";
-  }
-
   return (
     <div>
       <div className="fleet-head">
@@ -41,6 +71,14 @@ export default async function PortfolioPage() {
           <p className="subtle" style={{ marginTop: 5 }}>
             {props.length} {props.length === 1 ? "property" : "properties"} · {totalLocks} locks · live status
           </p>
+          <div className="legend">
+            <span className="legend-item"><span className="legend-swatch rc-ok" />Occupied · ok</span>
+            <span className="legend-item"><span className="legend-swatch rc-warning" />Occupied · low battery</span>
+            <span className="legend-item"><span className="legend-swatch rc-issue" />Occupied · offline</span>
+            <span className="legend-item"><span className="legend-swatch rc-vacant" />Vacant</span>
+            <span className="legend-item"><span className="legend-swatch rc-no-lock" />No lock assigned</span>
+            <span className="legend-item"><span className="legend-swatch rc-vacant rc-fault-issue" />Ring = lock fault (red offline · orange low batt)</span>
+          </div>
         </div>
         <div className="fleet-stats">
           <div className="fleet-stat"><div className="n tnum" style={{ color: "var(--ok)" }}>{totOnline}</div><div className="l">online</div></div>
@@ -78,15 +116,22 @@ export default async function PortfolioPage() {
                   <span className="dot" />{c.needsAttention ? `${c.needsAttention} to fix` : "All clear"}
                 </span>
               </div>
-              {c.locks.length > 0 && (
-                <div className="dotwell" style={{ marginBottom: 14 }}>
-                  {c.locks.map((l, i) => <span key={i} className={dotClass(l)} />)}
+              {c.chips.length > 0 && (
+                <div className="roomwell" style={{ marginBottom: 14 }}>
+                  {c.chips.map((ch) => (
+                    <span
+                      key={ch.roomId}
+                      className={`roomchip rc-${ch.status}${ch.fault ? ` rc-fault-${ch.fault}` : ""}`}
+                      title={`Room ${ch.label} · ${ch.status}${ch.fault ? ` · lock ${ch.fault === "issue" ? "offline" : "low battery"}` : ""}`}
+                    >{ch.label}</span>
+                  ))}
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div className="prop-stat" style={{ flex: 1 }}><div className="n tnum">{c.online}<span style={{ fontSize: 12, fontWeight: 500, color: "var(--faint)" }}>/{c.totalLocks}</span></div><div className="l">ONLINE</div></div>
-                <div className="prop-stat" style={{ flex: 1 }}><div className="n tnum" style={{ color: c.lowBattery ? "var(--warn-ink)" : "var(--ink)" }}>{c.lowBattery}</div><div className="l">LOW BATT</div></div>
-                <div className="prop-stat" style={{ flex: 1 }}><div className="n tnum" style={{ color: c.offline ? "var(--crit-ink)" : "var(--ink)" }}>{c.offline}</div><div className="l">OFFLINE</div></div>
+              <div className="statgrid">
+                <div className="statmini"><div className="n tnum">{c.online}<span className="den">/{c.totalLocks}</span></div><div className="l"><span className="legend-swatch rc-ok" />ONLINE</div></div>
+                <div className="statmini"><div className="n tnum" style={{ color: c.offline ? "var(--crit-ink)" : "var(--ink)" }}>{c.offline}</div><div className="l"><span className="legend-swatch rc-issue" />OFFLINE</div></div>
+                <div className="statmini"><div className="n tnum" style={{ color: c.lowBattery ? "var(--warn-ink)" : "var(--ink)" }}>{c.lowBattery}</div><div className="l"><span className="legend-swatch rc-warning" />LOW BATT</div></div>
+                <div className="statmini"><div className="n tnum">{c.noLock}</div><div className="l"><span className="legend-swatch rc-no-lock" />NO LOCK</div></div>
               </div>
             </Link>
           ))}
