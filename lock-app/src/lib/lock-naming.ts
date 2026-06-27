@@ -47,6 +47,15 @@ export function propertyOfUnassignedName(name: string): string | null {
   return null;
 }
 
+/**
+ * Best-guess property for a queued lock from its name, to pre-select the assign
+ * form's property dropdown: an `<ABBR> (unassigned)` pool name (a lock unmapped
+ * from that property) or a conforming `<ABBR>-<room>` name. "" when unknown.
+ */
+export function propertyFromLockName(name: string): string {
+  return propertyOfUnassignedName(name) ?? parseLockName(name)?.propertyId ?? "";
+}
+
 export interface ParsedLockName {
   propertyId: string;
   room: string;

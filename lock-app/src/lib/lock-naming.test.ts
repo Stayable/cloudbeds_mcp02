@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseLockName, classifyLock, canonicalLockName, guessRoomNumber,
-  unassignedLockName, propertyOfUnassignedName,
+  unassignedLockName, propertyOfUnassignedName, propertyFromLockName,
 } from "./lock-naming";
 
 describe("parseLockName", () => {
@@ -96,6 +96,11 @@ describe("unassigned naming", () => {
   });
   it("returns null for an unknown property", () => {
     expect(unassignedLockName("999999")).toBeNull();
+  });
+  it("propertyFromLockName picks the property from a pool or conforming name, else empty", () => {
+    expect(propertyFromLockName("LL (unassigned)")).toBe("210972");
+    expect(propertyFromLockName("KE-105")).toBe("210986");
+    expect(propertyFromLockName("some random lock")).toBe("");
   });
 });
 

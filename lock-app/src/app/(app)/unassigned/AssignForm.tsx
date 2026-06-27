@@ -17,8 +17,8 @@ interface RoomOption {
  * The room list loads after a property is chosen; if the property has no Cloudbeds
  * key configured the dropdown is disabled with a notice.
  */
-export default function AssignForm({ lockId, guessRoom }: { lockId: string; guessRoom: string }) {
-  const [propertyId, setPropertyId] = useState("");
+export default function AssignForm({ lockId, guessRoom, defaultPropertyId = "" }: { lockId: string; guessRoom: string; defaultPropertyId?: string }) {
+  const [propertyId, setPropertyId] = useState(defaultPropertyId);
   const [rooms, setRooms] = useState<RoomOption[]>([]);
   const [roomId, setRoomId] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "no-key" | "error">("idle");

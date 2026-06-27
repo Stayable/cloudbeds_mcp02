@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
-import { guessRoomNumber } from "@/lib/lock-naming";
+import { guessRoomNumber, propertyFromLockName } from "@/lib/lock-naming";
 import Forbidden from "@/components/Forbidden";
 import SyncButton from "./SyncButton";
 import AssignForm from "./AssignForm";
@@ -52,7 +52,7 @@ export default async function UnassignedPage() {
                 </div>
                 <span className={`pill ${l.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{l.online ? "online" : "offline"}</span>
                 {canAssign && (
-                  <AssignForm lockId={l.lockId.toString()} guessRoom={guessRoomNumber(l.name)} />
+                  <AssignForm lockId={l.lockId.toString()} guessRoom={guessRoomNumber(l.name)} defaultPropertyId={propertyFromLockName(l.name)} />
                 )}
               </div>
             );
