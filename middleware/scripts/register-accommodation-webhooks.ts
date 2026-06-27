@@ -57,7 +57,11 @@ const EVENTS = [
   { object: "reservation", action: "accommodation_removed" },
 ];
 
-interface Webhook { subscriptionID?: string; object?: string; action?: string; endpointUrl?: string; [k: string]: unknown }
+// Cloudbeds getWebhooks shape: { id, event:{entity,action}, subscriptionData:{url}, owner }
+interface Webhook { id?: string; event?: { entity?: string; action?: string }; subscriptionData?: { url?: string }; [k: string]: unknown }
+const entityOf = (w: Webhook) => w.event?.entity ?? "";
+const actionOf = (w: Webhook) => w.event?.action ?? "";
+const urlOf = (w: Webhook) => w.subscriptionData?.url ?? "";
 
 async function main() {
   const registry = CloudbedsRegistry.fromEnv();
@@ -68,40 +72,46 @@ async function main() {
   }
   console.log(`${APPLY ? "APPLY" : "LIST (dry-run — pass --apply to subscribe)"} · ${propertyIds.length} properties\n`);
 
+  // Pass 1: read every property's webhooks; discover the receiver URL to reuse.
+  const byProp = new Map<string, Webhook[]>();
+  let endpointUrl = process.env.MIDDLEWARE_WEBHOOK_URL?.trim() ?? "";
   for (const propertyId of propertyIds) {
-    const client = registry.resolve(propertyId);
-    let existing: Webhook[] = [];
     try {
-      const res = await client.get<Webhook[]>("getWebhooks", { propertyID: propertyId });
-      existing = (res.data ?? []) as Webhook[];
+      const res = await registry.resolve(propertyId).get<Webhook[]>("getWebhooks", { propertyID: propertyId });
+      const list = (res.data ?? []) as Webhook[];
+      byProp.set(propertyId, list);
+      if (!endpointUrl) endpointUrl = list.map(urlOf).find(Boolean) ?? "";
     } catch (e) {
       console.log(`property ${propertyId}: getWebhooks FAILED — ${(e as Error).message}`);
-      continue;
+      byProp.set(propertyId, []);
     }
+  }
+  if (!endpointUrl) {
+    console.error("Could not find a webhook endpoint URL on any account, and MIDDLEWARE_WEBHOOK_URL is not set. Aborting.");
+    process.exit(1);
+  }
+  console.log(`Receiver URL: ${endpointUrl}\n`);
 
+  // Pass 2: add the two accommodation events wherever they're missing.
+  for (const propertyId of propertyIds) {
+    const existing = byProp.get(propertyId) ?? [];
     console.log(`property ${propertyId}: ${existing.length} existing webhook(s)`);
-    for (const w of existing) console.log("    raw:", JSON.stringify(w));
-
-    const endpointUrl = process.env.MIDDLEWARE_WEBHOOK_URL?.trim() || existing.find((w) => w.endpointUrl)?.endpointUrl;
-    if (!endpointUrl) {
-      console.log(`    ! no existing endpointUrl and MIDDLEWARE_WEBHOOK_URL not set — cannot add events for ${propertyId}\n`);
-      continue;
-    }
+    for (const w of existing) console.log(`    • ${entityOf(w)}/${actionOf(w)}`);
 
     for (const ev of EVENTS) {
-      const already = existing.some((w) => w.object === ev.object && w.action === ev.action);
-      if (already) { console.log(`    = ${ev.object}/${ev.action} already subscribed`); continue; }
-      if (!APPLY) { console.log(`    + would subscribe ${ev.object}/${ev.action} → ${endpointUrl}`); continue; }
+      const already = existing.some((w) => entityOf(w) === ev.object && actionOf(w) === ev.action);
+      if (already) { console.log(`    = reservation/${ev.action} already subscribed`); continue; }
+      if (!APPLY) { console.log(`    + would subscribe reservation/${ev.action}`); continue; }
       try {
-        await client.post("postWebhook", { object: ev.object, action: ev.action, endpointUrl });
-        console.log(`    ✓ subscribed ${ev.object}/${ev.action}`);
+        await registry.resolve(propertyId).post("postWebhook", { object: ev.object, action: ev.action, endpointUrl });
+        console.log(`    ✓ subscribed reservation/${ev.action}`);
       } catch (e) {
-        console.log(`    ✗ subscribe ${ev.object}/${ev.action} FAILED — ${(e as Error).message}`);
+        console.log(`    ✗ subscribe reservation/${ev.action} FAILED — ${(e as Error).message}`);
       }
     }
     console.log("");
   }
-  console.log(APPLY ? "Done. Re-run without --apply to confirm both events now show as subscribed." : "Dry run only. Re-run with --apply once the listing looks right.");
+  console.log(APPLY ? "Done. Re-run without --apply to confirm." : "Dry run only. Re-run with --apply to subscribe.");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
