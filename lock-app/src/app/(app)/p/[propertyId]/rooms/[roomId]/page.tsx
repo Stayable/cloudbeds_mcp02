@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { splitCodes, type PasscodeInput } from "@/lib/door-detail";
+import { loadGuestDetails } from "@/lib/guest-loader";
 import Forbidden from "@/components/Forbidden";
 import RevealButton from "./RevealButton";
 import {
@@ -36,6 +37,10 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
   const battery = map?.battery ?? null;
   const battColor = battery == null ? "var(--faint)" : battery < 20 ? "var(--crit-ink)" : "var(--ink)";
   const label = map?.alias?.trim() || roomId;
+  const roomNumber = map?.roomName?.trim() || roomId;
+  const guestDetails = state?.currentReservationId
+    ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
+    : null;
 
   return (
     <div>
@@ -122,6 +127,27 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
 
         {/* RIGHT: health + mapping + history */}
         <div className="col">
+          {state?.currentReservationId && (
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: 14 }}>Guest</div>
+              {guestDetails ? (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12 }}>{guestDetails.name}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 13, alignItems: "baseline" }}>
+                    <span className="lbl">Room</span><span className="mono">{guestDetails.roomNumber}</span>
+                    <span className="lbl">Lease start</span><span className="mono">{guestDetails.leaseStart ?? "—"}</span>
+                    <span className="lbl">Lease end</span><span className="mono">{guestDetails.leaseEnd ?? "—"}</span>
+                    <span className="lbl">Email</span>
+                    <span>{guestDetails.email ? <a href={`mailto:${guestDetails.email}`}>{guestDetails.email}</a> : "—"}</span>
+                    <span className="lbl">Phone</span>
+                    <span>{guestDetails.phone ? <a href={`tel:${guestDetails.phone}`} className="mono">{guestDetails.phone}</a> : "—"}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="subtle">Contact details unavailable — check the Cloudbeds key for this property.</p>
+              )}
+            </div>
+          )}
           <div className="card">
             <div className="card-title" style={{ marginBottom: 16 }}>Lock health</div>
             {map ? (
