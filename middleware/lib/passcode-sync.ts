@@ -633,6 +633,11 @@ export async function reconcileCheckedInReservations(
     unmappedRooms: [],
   };
 
+  // Active guest codes for this property — used both to pick which reservations to
+  // re-verify (below) and to revoke stale ones (step 1).
+  const active = await prisma.passcode.findMany({ where: { propertyId, status: "active", type: "guest" } });
+  const coded = new Set(active.map((p) => p.reservationId).filter((r): r is string => !!r));
+
   // reservationId → { detail, desired rooms } for every checked-in reservation.
   const byRes = new Map<string, { detail: ReservationDetail; desired: Set<string> }>();
   for (const detail of reservations) {
@@ -640,18 +645,19 @@ export async function reconcileCheckedInReservations(
     if (!rid) continue;
     let full = detail;
     let rooms = extractRoomIds(detail);
-    // After a room MOVE, the getReservations LIST row comes back with the room
-    // assignment BLANK (the single getReservation is what's fresh). Without this
-    // fallback the reconcile sees no rooms and never moves the code — even though
-    // occupancy sync (which has this fallback) already moved the guest. Mirror it:
-    // when the list row carries no room, fetch the reservation for the true room.
-    if (rooms.length === 0) {
+    // The getReservations LIST lags a room move — it keeps returning the OLD room
+    // (or none) for a while after the single getReservation is already fresh. So
+    // re-fetch authoritatively when the list row has no room OR this reservation
+    // holds an active code (a move candidate); otherwise a moved guest's code never
+    // follows them. Bounded by active-code count; the accommodation webhook is the
+    // instant/zero-poll path at scale.
+    if (rooms.length === 0 || coded.has(rid)) {
       try {
         const fetched = await getReservation(registry, propertyId, rid);
         full = { ...detail, ...fetched };
         rooms = extractRoomIds(full);
       } catch {
-        /* keep empty — conservative; we won't falsely revoke without a known room */
+        /* keep list rooms — conservative; we won't falsely revoke without a known room */
       }
     }
     byRes.set(rid, { detail: full, desired: new Set(rooms) });
@@ -662,7 +668,6 @@ export async function reconcileCheckedInReservations(
   //    PIN is on a room they no longer occupy (definitive room change). Room-transfer
   //    grace keeps the old room's code working a few more minutes.
   const { transferGraceMinutes } = await getGraceSettings();
-  const active = await prisma.passcode.findMany({ where: { propertyId, status: "active" } });
   for (const pc of active) {
     const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
     // Skip unless we POSITIVELY know this reservation's current rooms (non-empty)
