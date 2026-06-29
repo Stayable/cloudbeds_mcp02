@@ -67,6 +67,11 @@ model Passcode {
   status        String // active | revoked | failed
   type          String   @default("guest") // guest | backup | manual
   backupSlot    Int? // backup codes only: which slot (1..5) this PIN occupies; null = legacy/slot 1
+  // Duplicate-PIN guard: "<reservationId>:<roomId>" while this is the ACTIVE guest
+  // code; null otherwise. Unique → DB rejects a second active guest code for the
+  // same room+reservation, so the */5 cron and a webhook can't both mint one.
+  // Nulled on revoke/expire so the next code can reuse the key. (Mirror of lock-app.)
+  activeKey     String?  @unique
   createdAt     DateTime @default(now())
 
   @@index([reservationId])

@@ -74,6 +74,13 @@ model Passcode {
   status        String // active | revoked | failed
   type          String   @default("guest") // guest | backup | manual
   backupSlot    Int? // backup codes only: which slot (1..5) this PIN occupies; null = legacy/slot 1
+  // Duplicate-PIN guard: "<reservationId>:<roomId>" while this is the ACTIVE guest
+  // code; null otherwise (revoked/expiring, and all manual/backup codes). The
+  // unique constraint makes the DB reject a second active guest code for the same
+  // room+reservation, so the cron and a webhook can't both mint one (Postgres
+  // allows many NULLs). Nulled when the code is revoked/expired so the next one
+  // can reuse the key.
+  activeKey     String?  @unique
   createdAt     DateTime @default(now())
 
   @@index([reservationId])

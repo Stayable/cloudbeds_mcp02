@@ -117,6 +117,17 @@ export function isPaidInFull(balance: number | string | null | undefined): boole
 }
 
 /**
+ * Dedup key for the duplicate-PIN guard: identifies THE active guest code for a
+ * (reservation, room). Stored in Passcode.activeKey (unique) while the code is
+ * active and nulled when it's revoked/expired, so the DB rejects a second active
+ * code for the same pair — preventing the every-5-min cron and a webhook from
+ * both minting one. Per-room so a multi-room reservation gets one key per room.
+ */
+export function activeKeyFor(reservationId: string, roomId: string): string {
+  return `${reservationId}:${roomId}`;
+}
+
+/**
  * Which properties the poll-reconcile cron should actually hit. A property with
  * no mapped locks can't have a PIN to reconcile, so calling Cloudbeds for it is
  * wasted API load — skip it (big win during rollout, when most properties have no

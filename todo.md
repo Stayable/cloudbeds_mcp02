@@ -100,10 +100,14 @@ ROOM-CHANGE AUTO PLAN (2026-06-30):
   (NOT before Pro — Hobby rejects sub-daily crons and freezes the deploy); (3) run
   register-accommodation-webhooks.ts --apply + verify the event actually delivers — if it does, relax the cron
   to ~30 min (event-driven primary + cron backstop, near-zero API load).
-- [ ] DUPLICATE-PIN GUARD (do before sub-daily cron goes live): partial unique index on Passcode (one ACTIVE
-      guest PIN per (reservationId, roomId)) so a cron+webhook race can't double-create. Catch P2002 in
-      createPasscodeForRoom → delete the orphan TTLock code + return. Low-harm today (both codes work,
-      self-heals on revoke) but more likely at */5. TDD, deployable on Hobby now.
+- [x] DUPLICATE-PIN GUARD DONE 2026-06-30. Used a nullable UNIQUE `Passcode.activeKey` ("<resId>:<roomId>"
+      while active, null on revoke/expire) instead of a partial index — Prisma-native so db push preserves it,
+      no long txn, Postgres allows many NULLs (manual/backup/expiring stay null). Both schemas + pushed to Neon
+      (prod had 0 active guest codes → clean add). createPasscodeForRoom sets activeKey + catches P2002 →
+      deletes the orphan TTLock code + logs `passcode_create_deduped` + returns (lost race, benign). All revoke
+      paths null activeKey (revokePasscodes, both reconcile loops, lock-app revokeGuestCode). activeKeyFor helper
+      (TDD). Grace-compatible: an `expiring` code = activeKey null, so it never blocks the new active code.
+- [x] CRON */5 LIVE 2026-06-30 (Pro) — vercel.json bumped, middleware auto-deployed.
 
 NEW BACKLOG (2026-06-30, from BK — captured, NOT yet built):
 - [~] ⭐ GRACE PERIOD / revoke-delay. SETTINGS SHIPPED 2026-06-30 (Settings → Access timing: checkout grace

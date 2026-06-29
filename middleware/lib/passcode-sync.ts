@@ -28,6 +28,7 @@ import {
   isPaidInFull,
   isCheckedIn,
   passcodeWindowChanged,
+  activeKeyFor,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
@@ -280,15 +281,19 @@ async function createPasscodeForRoom(
   }
 
   const pin = generatePin();
+  let keyboardPwdId: number | undefined;
   try {
-    const { keyboardPwdId } = await createPasscode({
+    ({ keyboardPwdId } = await createPasscode({
       lockId: map.lockId,
       passcode: pin,
       startDate: startTs,
       endDate: endTs,
       name: `Res ${reservationId}`,
-    });
+    }));
 
+    // activeKey is UNIQUE: if a concurrent run (cron vs webhook) already created
+    // THE active code for this (reservation, room), this insert throws P2002 and
+    // we clean up below — guaranteeing exactly one active guest code per room.
     await prisma.passcode.create({
       data: {
         reservationId, propertyId, roomId,
@@ -298,6 +303,7 @@ async function createPasscodeForRoom(
         startTs: BigInt(startTs),
         endTs: BigInt(endTs),
         status: "active",
+        activeKey: activeKeyFor(reservationId, roomId),
       },
     });
     result.pinsCreated++;
@@ -343,6 +349,23 @@ async function createPasscodeForRoom(
       });
     }
   } catch (err: any) {
+    // Lost the create race: the unique activeKey rejected this insert because
+    // another run already created THE active code for this (reservation, room).
+    // Delete the duplicate we just pushed to the lock so it isn't orphaned, then
+    // bow out quietly — the winner's code is canonical. (Not a failure.)
+    if (err?.code === "P2002") {
+      if (keyboardPwdId != null) {
+        await deletePasscode({ lockId: map.lockId, keyboardPwdId }).catch(() => {});
+      }
+      await prisma.eventLog.create({
+        data: {
+          source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+          action: "passcode_create_deduped",
+          detail: { reservationId, keyboardPwdId: keyboardPwdId != null ? String(keyboardPwdId) : null },
+        },
+      }).catch(() => {});
+      return;
+    }
     const msg = err?.message ?? String(err);
     // A gateway/connectivity failure (TTLock -2012) means the lock is unreachable.
     const offline = /gateway|not connected|-2012/i.test(msg);
@@ -404,7 +427,7 @@ export async function revokePasscodes(
     await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
     await prisma.passcode.update({
       where: { id: pc.id },
-      data: { status: "revoked" },
+      data: { status: "revoked", activeKey: null },
     });
     result.pinsRevoked++;
 
@@ -470,7 +493,7 @@ export async function reconcilePasscodes(
   for (const pc of active) {
     if (desiredSet.has(pc.roomId)) continue;
     await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
-    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked" } });
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
     result.pinsRevoked++;
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
@@ -552,7 +575,7 @@ export async function reconcileCheckedInReservations(
     const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
     if (!entry || entry.desired.has(pc.roomId)) continue;
     await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
-    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked" } });
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
     result.pinsRevoked++;
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },

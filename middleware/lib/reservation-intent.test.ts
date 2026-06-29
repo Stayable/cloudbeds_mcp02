@@ -2,8 +2,17 @@ import { describe, it, expect } from "vitest";
 import {
   classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn,
   reconcileDesiredRooms, reservationIdOf, propertyIdOf, passcodeWindowChanged,
-  propertiesToReconcile,
+  propertiesToReconcile, activeKeyFor,
 } from "./reservation-intent";
+
+describe("activeKeyFor", () => {
+  it("builds a stable <reservationId>:<roomId> dedup key", () => {
+    expect(activeKeyFor("3435425699816", "405761-25")).toBe("3435425699816:405761-25");
+  });
+  it("is distinct per room so a multi-room reservation gets one key per room", () => {
+    expect(activeKeyFor("R1", "A")).not.toBe(activeKeyFor("R1", "B"));
+  });
+});
 
 describe("propertiesToReconcile", () => {
   const all = ["210972", "208155", "210986"];

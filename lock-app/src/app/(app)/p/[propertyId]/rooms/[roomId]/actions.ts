@@ -43,7 +43,8 @@ export async function revokeGuestCode(propertyId: string, roomId: string): Promi
   } catch (e) {
     return { ok: false, error: mapActionError(e) };
   }
-  await prisma.passcode.update({ where: { id: code.id }, data: { status: "revoked" } });
+  // Null activeKey so the duplicate-PIN guard frees this (reservation, room) slot.
+  await prisma.passcode.update({ where: { id: code.id }, data: { status: "revoked", activeKey: null } });
   await writeAudit(user, {
     action: "guest_code_revoked", propertyId, roomId, lockId: code.lockId,
     detail: buildDetail({ reservationId: code.reservationId ?? undefined }),
