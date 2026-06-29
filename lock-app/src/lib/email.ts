@@ -43,7 +43,10 @@ export function buildOtpEmail(code: string): { subject: string; html: string; te
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY not configured");
-  const from = process.env.EMAIL_FROM || "Stayable Locks <onboarding@resend.dev>";
+  // Authoritative value is the EMAIL_FROM env var; this fallback is the verified
+  // Stayable sender so a missing env var still sends from a real (DNS-verified)
+  // address rather than Resend's sandbox domain.
+  const from = process.env.EMAIL_FROM || "Stayable Locks <admin@rentstayable.com>";
 
   const { subject, html, text } = buildOtpEmail(code);
   const res = await fetch(RESEND_ENDPOINT, {
