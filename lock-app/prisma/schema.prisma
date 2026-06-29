@@ -55,6 +55,7 @@ model Passcode {
   endTs         BigInt
   status        String // active | revoked | failed
   type          String   @default("guest") // guest | backup | manual
+  backupSlot    Int? // backup codes only: which slot (1..5) this PIN occupies; null = legacy/slot 1
   createdAt     DateTime @default(now())
 
   @@index([reservationId])

@@ -1,8 +1,22 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn,
-  reconcileDesiredRooms, reservationIdOf, propertyIdOf,
+  reconcileDesiredRooms, reservationIdOf, propertyIdOf, passcodeWindowChanged,
 } from "./reservation-intent";
+
+describe("passcodeWindowChanged", () => {
+  // A stay extension keeps the SAME PIN but moves the checkout date — we must
+  // detect that the existing code's window no longer matches the reservation.
+  it("is true when the end date moved (a stay extension)", () => {
+    expect(passcodeWindowChanged({ startTs: 100, endTs: 200 }, { startTs: 100, endTs: 300 })).toBe(true);
+  });
+  it("is true when the start date moved", () => {
+    expect(passcodeWindowChanged({ startTs: 100, endTs: 200 }, { startTs: 50, endTs: 200 })).toBe(true);
+  });
+  it("is false when the window is unchanged (idempotent redelivery)", () => {
+    expect(passcodeWindowChanged({ startTs: 100, endTs: 200 }, { startTs: 100, endTs: 200 })).toBe(false);
+  });
+});
 
 describe("classifyIntent", () => {
   // Cloudbeds check-in lives in guestStatus, and the status_changed payload's

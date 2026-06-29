@@ -117,6 +117,20 @@ export function isPaidInFull(balance: number | string | null | undefined): boole
 }
 
 /**
+ * True if a reservation's desired validity window differs from the window an
+ * existing PIN was issued for. A stay extension (the common transient/long-term
+ * case) keeps the same reservation+room — so we must NOT mint a new PIN — but the
+ * checkout date moves, so the retained PIN's window has to be pushed out to match.
+ * Exact compare: both windows derive deterministically from the reservation dates.
+ */
+export function passcodeWindowChanged(
+  existing: { startTs: number; endTs: number },
+  desired: { startTs: number; endTs: number },
+): boolean {
+  return existing.startTs !== desired.startTs || existing.endTs !== desired.endTs;
+}
+
+/**
  * Note written onto the Cloudbeds reservation: `<lockName>-<PIN>`
  * (e.g. "LL-239-445572"), matching the devicethread-style token format.
  */

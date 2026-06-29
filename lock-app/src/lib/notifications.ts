@@ -18,6 +18,17 @@ export function isAlertEvent(outcome: string | undefined): boolean {
   return outcome === "warning" || outcome === "failed";
 }
 
+/**
+ * Whether an EventLog row belongs in the notification BELL. An alert (warning|
+ * failed) qualifies UNLESS it's a code-reveal action (`code_revealed`,
+ * `backup_code_revealed`): reveals are routine, intentional admin actions logged
+ * as warnings for the audit trail — they belong in the Activity log, not the bell.
+ */
+export function isBellEvent(action: string | undefined, outcome: string | undefined): boolean {
+  if (!isAlertEvent(outcome)) return false;
+  return !(action ?? "").includes("reveal");
+}
+
 export function unseenCount(items: NotificationItem[], seenAt: Date | null): number {
   if (!seenAt) return items.length;
   return items.filter((i) => i.createdAt > seenAt).length;

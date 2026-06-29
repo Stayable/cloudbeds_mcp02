@@ -154,6 +154,34 @@ export interface DeletePasscodeArgs {
   keyboardPwdId: number | bigint;
 }
 
+export interface ChangePasscodePeriodArgs {
+  lockId: number | bigint;
+  keyboardPwdId: number | bigint;
+  /** New validity window, epoch-ms. */
+  startDate: number;
+  endDate: number;
+}
+
+/**
+ * Change an existing passcode's validity window WITHOUT changing the digits
+ * (stay extension: same PIN, later checkout). changeType=2 => via gateway/WiFi.
+ * Mirrored from middleware/lib/ttlock.ts — keep the two clients in sync.
+ */
+export async function changePasscodePeriod(args: ChangePasscodePeriodArgs): Promise<void> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/keyboardPwd/changePeriod", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(args.lockId),
+    keyboardPwdId: String(args.keyboardPwdId),
+    startDate: args.startDate,
+    endDate: args.endDate,
+    changeType: 2,
+    date: Date.now(),
+  });
+  assertOk(body, "keyboardPwd/changePeriod");
+}
+
 export async function deletePasscode(args: DeletePasscodeArgs): Promise<void> {
   const { accessToken } = await getTTLockToken();
   const body = await postForm("/v3/keyboardPwd/delete", {

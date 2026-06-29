@@ -1,7 +1,7 @@
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { userProperties } from "@/lib/session-access";
-import { isAlertEvent, unseenCount, recentNotifications, type NotificationItem } from "@/lib/notifications";
+import { isBellEvent, unseenCount, recentNotifications, type NotificationItem } from "@/lib/notifications";
 import NotificationBell from "./NotificationBell";
 import ProfileMenu, { type Prefs } from "./ProfileMenu";
 
@@ -17,7 +17,7 @@ export default async function TopBar({ user }: { user: SessionUser }) {
     orderBy: { createdAt: "desc" }, take: 100,
   });
   const items: NotificationItem[] = rows
-    .filter((r) => isAlertEvent((r.detail as { outcome?: string } | null)?.outcome))
+    .filter((r) => isBellEvent(r.action, (r.detail as { outcome?: string } | null)?.outcome))
     .map((r) => ({
       id: r.id,
       message: (r.detail as { message?: string } | null)?.message ?? r.action,

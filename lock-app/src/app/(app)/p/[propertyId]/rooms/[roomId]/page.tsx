@@ -32,9 +32,9 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
   const rows: PasscodeInput[] = codes.map((c) => ({
     keyboardPwdId: String(c.keyboardPwdId), pin: c.pin, type: c.type, status: c.status,
     startTs: Number(c.startTs), endTs: Number(c.endTs),
-    reservationId: c.reservationId, createdAt: c.createdAt.getTime(),
+    reservationId: c.reservationId, createdAt: c.createdAt.getTime(), backupSlot: c.backupSlot,
   }));
-  const { guest, backup, manual, history } = splitCodes(rows, Date.now());
+  const { guest, backups, manual, history } = splitCodes(rows, Date.now());
   const can = (p: Parameters<typeof sessionCan>[1]) => sessionCan(user, p, propertyId);
 
   const battery = map?.battery ?? null;
@@ -114,20 +114,31 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
 
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <span className="card-title">Staff backup PIN</span><span className="chip chip-warn">SENSITIVE · OFFLINE</span>
+              <span className="card-title">Backup PINs (offline)</span><span className="chip chip-warn">SENSITIVE · OFFLINE</span>
             </div>
-            {backup ? (
-              <div className="pin-value mono" style={{ color: "var(--ink)", fontSize: 24 }}>
-                {can("backup_code.reveal")
-                  ? <RevealButton variant="onLight" label={`Reveal ${backup.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId); }} />
-                  : backup.maskedPin}
-              </div>
-            ) : <p className="subtle">No backup code set.</p>}
-            {can("backup_code.rotate") && map && (
-              <form action={async () => { "use server"; await rotateBackupCode(propertyId, roomId); }} style={{ marginTop: 14 }}>
-                <button className="btn btn-navy">{backup ? "Rotate" : "Create backup code"}</button>
-              </form>
-            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {backups.map((b, i) => {
+                const slot = i + 1;
+                return (
+                  <div key={slot} style={{ display: "flex", alignItems: "center", gap: 12, borderTop: i > 0 ? "1px solid var(--divider)" : undefined, paddingTop: i > 0 ? 10 : 0 }}>
+                    <span className="lbl" style={{ width: 64 }}>Backup {slot}</span>
+                    <div className="mono" style={{ flex: 1, fontSize: 18, color: b ? "var(--ink)" : "var(--faint)" }}>
+                      {b
+                        ? (can("backup_code.reveal")
+                            ? <RevealButton variant="onLight" label={`Reveal ${b.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId, slot); }} />
+                            : b.maskedPin)
+                        : "Not set"}
+                    </div>
+                    {can("backup_code.rotate") && map && (
+                      <form action={async () => { "use server"; await rotateBackupCode(propertyId, roomId, slot); }}>
+                        <button className="btn btn-navy">{b ? "Rotate" : "Create"}</button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {!map && <p className="subtle" style={{ marginTop: 12 }}>Map a lock to this room to set backup codes.</p>}
           </div>
 
           {can("guest_code.generate_manual") && map && (

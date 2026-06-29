@@ -314,6 +314,35 @@ export interface DeletePasscodeArgs {
   keyboardPwdId: number | bigint;
 }
 
+export interface ChangePasscodePeriodArgs {
+  lockId: number | bigint;
+  keyboardPwdId: number | bigint;
+  /** New validity window, epoch-ms. */
+  startDate: number;
+  endDate: number;
+}
+
+/**
+ * Change an existing passcode's validity window WITHOUT changing the digits.
+ * Used for a stay extension: the guest keeps the same PIN; only the checkout
+ * (end) date moves out. changeType=2 => push the change via the gateway/WiFi
+ * (matches addType=2/deleteType=2 elsewhere).
+ */
+export async function changePasscodePeriod(args: ChangePasscodePeriodArgs): Promise<void> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/keyboardPwd/changePeriod", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(args.lockId),
+    keyboardPwdId: String(args.keyboardPwdId),
+    startDate: args.startDate,
+    endDate: args.endDate,
+    changeType: 2,
+    date: Date.now(),
+  });
+  assertOk(body, "keyboardPwd/changePeriod");
+}
+
 /** Delete a previously created passcode. deleteType=2 => via gateway/WiFi. */
 export async function deletePasscode(args: DeletePasscodeArgs): Promise<void> {
   const { accessToken } = await getTTLockToken();

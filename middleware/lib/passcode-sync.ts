@@ -18,7 +18,7 @@ import {
   postReservationNote,
   roomNameFor,
 } from "./cloudbeds";
-import { createPasscode, deletePasscode } from "./ttlock";
+import { createPasscode, deletePasscode, changePasscodePeriod } from "./ttlock";
 import {
   classifyIntent,
   reservationNoteBody,
@@ -27,6 +27,7 @@ import {
   propertyIdOf,
   isPaidInFull,
   isCheckedIn,
+  passcodeWindowChanged,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
@@ -223,11 +224,60 @@ async function createPasscodeForRoom(
     return;
   }
 
-  // Idempotency guard: skip if this (reservation, room) already has a live PIN.
+  // Stay-extension handling: if this (reservation, room) already has a live PIN,
+  // keep the SAME digits — transient/long-term guests extend daily/weekly and must
+  // NOT get a new code. But if the reservation's dates moved (an extension), push
+  // the existing code's validity window out to match so it doesn't expire at the
+  // original checkout. A redelivery with an unchanged window is a no-op.
   const existing = await prisma.passcode.findFirst({
     where: { reservationId, roomId, status: "active" },
   });
-  if (existing) return;
+  if (existing) {
+    const windowMoved = passcodeWindowChanged(
+      { startTs: Number(existing.startTs), endTs: Number(existing.endTs) },
+      { startTs, endTs },
+    );
+    if (windowMoved) {
+      try {
+        await changePasscodePeriod({
+          lockId: existing.lockId,
+          keyboardPwdId: existing.keyboardPwdId,
+          startDate: startTs,
+          endDate: endTs,
+        });
+        await prisma.passcode.update({
+          where: { id: existing.id },
+          data: { startTs: BigInt(startTs), endTs: BigInt(endTs) },
+        });
+        await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
+        await prisma.eventLog.create({
+          data: {
+            source: "webhook", event: payload.event, propertyId, roomId, lockId: existing.lockId,
+            action: "passcode_period_changed",
+            detail: { reservationId, keyboardPwdId: String(existing.keyboardPwdId), startTs, endTs },
+          },
+        });
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        const offline = /gateway|not connected|-2012/i.test(msg);
+        if (offline) {
+          await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
+        }
+        await prisma.eventLog.create({
+          data: {
+            source: "webhook", event: payload.event, propertyId, roomId, lockId: existing.lockId,
+            action: "passcode_period_change_failed",
+            detail: { reservationId, error: msg, offline },
+          },
+        });
+        // Offline lock: don't throw (a 1-min retry won't fix it; the poll cron / next
+        // event re-attempts). Other errors are transient → throw so Cloudbeds retries.
+        if (offline) return;
+        throw err;
+      }
+    }
+    return;
+  }
 
   const pin = generatePin();
   try {

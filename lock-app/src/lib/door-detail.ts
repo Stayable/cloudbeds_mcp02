@@ -5,6 +5,9 @@
  */
 import { maskPin } from "./rooms";
 
+/** Number of independent staff backup-PIN slots per lock (each rotatable). */
+export const BACKUP_SLOTS = 5;
+
 export type CodeStatus = "active" | "expired" | "revoked";
 
 export interface PasscodeInput {
@@ -16,6 +19,8 @@ export interface PasscodeInput {
   endTs: number;
   reservationId: string | null;
   createdAt: number;
+  /** Backup-only: which slot (1..BACKUP_SLOTS) this code occupies. Legacy rows are null → slot 1. */
+  backupSlot?: number | null;
 }
 
 export interface CodeRow {
@@ -52,9 +57,16 @@ export function toCodeRow(p: PasscodeInput, nowMs: number): CodeRow {
   };
 }
 
+/** Backup slot a code occupies (1..BACKUP_SLOTS); legacy rows with no slot → 1. */
+function backupSlotOf(p: PasscodeInput): number {
+  const s = p.backupSlot ?? 1;
+  return s >= 1 && s <= BACKUP_SLOTS ? s : 1;
+}
+
 export function splitCodes(rows: PasscodeInput[], nowMs: number) {
   let guest: CodeRow | null = null;
-  let backup: CodeRow | null = null;
+  // One active code per backup slot (1-indexed); null = slot empty.
+  const backups: (CodeRow | null)[] = Array(BACKUP_SLOTS).fill(null);
   const manual: CodeRow[] = [];
   const history: CodeRow[] = [];
   // History newest-first; deterministic ordering independent of input order.
@@ -66,9 +78,13 @@ export function splitCodes(rows: PasscodeInput[], nowMs: number) {
       continue;
     }
     if (p.type === "guest" && !guest) guest = row;
-    else if (p.type === "backup" && !backup) backup = row;
+    else if (p.type === "backup") {
+      const i = backupSlotOf(p) - 1;
+      if (!backups[i]) backups[i] = row;
+      else history.push(row); // a second active code in the same slot — surface it
+    }
     else if (p.type === "manual") manual.push(row);
     else history.push(row); // a second active code of a singleton type — surface it
   }
-  return { guest, backup, manual, history };
+  return { guest, backups, manual, history };
 }

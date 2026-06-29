@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isAlertEvent, unseenCount, recentNotifications, type NotificationItem } from "./notifications";
+import { isAlertEvent, isBellEvent, unseenCount, recentNotifications, type NotificationItem } from "./notifications";
 
 const mk = (id: string, ms: number, outcome: "warning" | "failed" = "warning"): NotificationItem =>
   ({ id, message: `m${id}`, outcome, createdAt: new Date(ms), roomId: "101", propertyId: "210972" });
@@ -10,6 +10,21 @@ describe("isAlertEvent", () => {
     expect(isAlertEvent("failed")).toBe(true);
     expect(isAlertEvent("success")).toBe(false);
     expect(isAlertEvent(undefined)).toBe(false);
+  });
+});
+
+describe("isBellEvent", () => {
+  it("surfaces warning/failed events that are not reveals", () => {
+    expect(isBellEvent("passcode_create_failed", "failed")).toBe(true);
+    expect(isBellEvent("sync_from_lock", "warning")).toBe(true);
+  });
+  it("excludes reveal actions even when they are warnings", () => {
+    expect(isBellEvent("code_revealed", "warning")).toBe(false);
+    expect(isBellEvent("backup_code_revealed", "warning")).toBe(false);
+  });
+  it("excludes non-alert outcomes regardless of action", () => {
+    expect(isBellEvent("sync_from_lock", "success")).toBe(false);
+    expect(isBellEvent("manual_code_created", undefined)).toBe(false);
   });
 });
 

@@ -49,21 +49,23 @@ DEFERRED (BK said later): lock-health poll cron (idle-lock online/battery — "P
   "replace not append" on room-change (new note posts, old lingers — PIN IS revoked, cosmetic); set CRON_SECRET on
   both Vercel projects (cron auth + manual trigger); roll out webhooks to the other 7 properties.
 
-NEW BACKLOG (2026-06-28 PM, from BK — captured, NOT yet built):
-- [ ] ⭐ **Stay EXTENSION must keep the SAME code (DeviceThread regenerates — bad for our transient/long-term
-      guests who extend daily/weekly).** FINDING (verified passcode-sync.ts:227-230): we already RETAIN the PIN on
-      extend (idempotency guard skips if an active passcode exists for (reservation,room)) → we do NOT mint a new
-      code. **BUG:** we do NOT update the retained PIN's validity window, so it still expires at the ORIGINAL
-      checkout date. FIX: on a date change, UPDATE the existing TTLock passcode's endDate (TTLock keyboardPwd
-      change-period endpoint) + Passcode.endTs — keep the same digits, extend the window. (What event fires on a
-      Cloudbeds date-extension is unconfirmed — check: status_changed vs a modify event; the poll cron could also
-      refresh windows for checked-in reservations.)
-- [ ] **Backup codes: 5 per lock, each with its own rotate.** Rename "Staff backup PIN" → **"Backup PIN
-      (offline)"**. Today there's ONE permanent backup code (BACKUP_PWD_TYPE) + one Rotate. Make it 5 codes, each
-      independently rotatable. Files: room detail page.tsx + actions.ts (rotateBackupCode → per-slot).
-- [ ] **Reveal actions should NOT hit the notification bell.** `code_revealed` / `backup_code_revealed` are logged
-      outcome=warning → currently surface in notifications. Exclude reveal actions from the bell feed (keep them in
-      the Activity log — they're routine admin actions, not alerts). File: lock-app/src/lib/notifications.ts.
+NEW BACKLOG (2026-06-28 PM, from BK):
+- [x] ⭐ **Stay EXTENSION keeps the SAME code + window now extends** (DONE 2026-06-29). createPasscodeForRoom's
+      idempotency guard now: if an active PIN exists for (reservation,room), keep the digits but — when the
+      reservation dates moved — call TTLock `keyboardPwd/changePeriod` (new `changePasscodePeriod` in BOTH
+      ttlock.ts clients, changeType=2) + update Passcode.startTs/endTs, log `passcode_period_changed`. Offline
+      lock → mark offline + `passcode_period_change_failed`, don't throw (poll cron / next event retries). Pure
+      decision `passcodeWindowChanged` in reservation-intent.ts (TDD). The daily reconcile cron ALSO refreshes
+      windows (it calls the same helper) — covers the case where a Cloudbeds date-extension fires no event we get.
+- [x] **Backup codes: 5 per lock, each independently rotatable** + label renamed "Staff backup PIN" → **"Backup
+      PINs (offline)"** (DONE 2026-06-29). Added `Passcode.backupSlot Int?` (both schemas, pushed to Neon).
+      splitCodes returns `backups: (CodeRow|null)[]` length BACKUP_SLOTS=5 (legacy null slot → slot 1) (TDD).
+      reveal/rotateBackupCode now take a `slot`; room detail renders 5 slot rows each with its own Reveal +
+      Rotate/Create. Files: door-detail.ts, actions.ts, room detail page.tsx.
+- [x] **Reveal actions excluded from the notification bell** (DONE 2026-06-29). New `isBellEvent(action,outcome)`
+      in notifications.ts = alert AND not a reveal; TopBar bell filter uses it. Reveals still appear in the
+      Activity log (amber) — only the bell is filtered. (TDD.)
+NOT YET DEPLOYED — committed? no. Push to deploy (lock-app + middleware are Git-connected → auto-deploy).
 - [ ] **User Logs** — a view of actions taken within the dashboards, per user (EventLog already stores
       actorUserId/actorEmail/actorRole). CLARIFY w/ BK: dedicated "User Logs" page vs a user filter on the existing
       Activity page.
