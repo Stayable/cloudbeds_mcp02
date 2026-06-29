@@ -2,6 +2,36 @@
 
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
+
+RESUME HERE (2026-06-29 EOD) — Branch tip **6c71640**, all committed+pushed (origin even). Big day; lots shipped + a hard live-debug of room-change.
+⭐ NEXT (do first): **Register the accommodation webhooks** — `cd middleware && npx tsx scripts/register-accommodation-webhooks.ts` (dry run) then `--apply`. Run in a NORMAL terminal (not Claude sandbox — CB blocked here). If `--apply` 403s → key needs Webhooks/Notifications scope. This is THE fix for room-change reliability (see ROOT CAUSE below). BK hit "consistent errors" trying earlier — debug those (likely key scope or the script's env/endpoint-URL discovery).
+ROOM-CHANGE ROOT CAUSE (confirmed live 2026-06-29): code logic is CORRECT (238→239 move worked end-to-end via cron). The blocker is **Cloudbeds read-API lag on room moves — and it's PER-KEY**: the middleware + lock-app use SEPARATE CB keys, and CB propagates a room change to them at different speeds (lock-app key showed 238 while middleware key still returned 239 for 10+ min → reconcile correctly saw "no change"). Polling (cron/resync) CANNOT beat this. The accommodation **webhook** sidesteps it: its payload carries roomId/roomIdPrev, and `reconcilePasscodes`→`reconcileDesiredRooms` already uses those hints, so the move happens from the EVENT, not a laggy getReservation read → instant + lag-immune.
+VERIFY-LATER (sandbox can't reach CB/Vercel): CRON_SECRET added to BOTH lock-app + lock-middleware in Vercel (BK) — confirm a redeploy picked it up. */5 cron confirmed firing (Settings→Cron, last runs every 5 min). Grace currently **0/0** (BK set for testing — revert to 10/10 or final values after).
+SHIPPED 2026-06-29 (all pushed; lock-app + lock-middleware ARE Git-connected, auto-deploy confirmed):
+  • Cron */5 (Pro) + Lever-1 (reconcile skips lockless properties; ?propertyId= test filter).
+  • Dup-PIN guard: unique `Passcode.activeKey` (one active guest code per res+room; P2002→delete orphan).
+  • Grace period FULLY WIRED + configurable (Settings→Access timing, settings.manage): checkout/transfer
+    grace via changePasscodePeriod→status "expiring"; sweepExpiredPasscodes in cron; isCheckout gate.
+  • Expired-code fix: validity window padded +5h (EASTERN_END_PAD_MS) so codes cover the FL local checkout day.
+  • Resend-code button (room detail): re-issues guest code w/ fresh window + reposts note; added post()+
+    postReservationNote() to lock-app CB client.
+  • EMAIL_FROM → "Stayable Locks <admin@rentstayable.com>" (senderFrom wraps bare addr; BK set Vercel env).
+  • Dashboard→room back-link returns to Dashboard (?from=dashboard).
+  • Settings "Saved ✓" confirmation (useFormState).
+  • Live AUTO-REFRESH: /api/state-version (cheap DB signature) + <AutoRefresh> polls 12s, router.refresh()
+    only on change (no CB calls steady-state; PAUSES when tab hidden → that's why a manual refresh was needed
+    when the tab was backgrounded). On dashboard + room detail.
+  • Reconcile move-detection hardened twice: re-fetch getReservation for coded reservations (ba07270) +
+    handle coded reservations ABSENT from the checked-in list (6c71640). Logic verified; gated only by CB read-lag.
+  • Debug probe: GET /api/debug/reservation?propertyId=&reservationId= (session-gated) → status + extractedRooms
+    + raw room shapes. Uses the LOCK-APP CB key (note: middleware key can read differently — that's the per-key lag).
+LOOSE ENDS / FOLLOW-UPS:
+  - Harden **Sync Occupancy** the same way as the reconcile (it has a stale-room blind spot: only falls back to
+    getReservation when the list row is EMPTY, so a stale non-empty room keeps the green wrong). lock-app occupancy-sync.ts.
+  - Earlier backlog still open: 5-backup-PINs (DONE earlier), Resend templates (Resend email send not wired),
+    SMS (Twilio, on hold), User Logs page, verify users in prod.
+  - Temp/debug: /api/debug/reservation is a live debug route — fine to keep, or remove later.
+
 Status: **spec APPROVED. Phases 2+3 built; webhook built (Phase 4). TTLock auth
 VALIDATED LIVE. lock-app Plans 2+3 DONE + property-first restructure DONE (OTP login,
 Portfolio→Dashboard flow, property sidebar, top-bar profile + notification bell).**
