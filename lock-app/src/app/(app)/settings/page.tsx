@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import Forbidden from "@/components/Forbidden";
-import { saveAccessTiming } from "../settings-actions";
-import { CHECKOUT_GRACE_MAX, TRANSFER_GRACE_MAX } from "@/lib/settings";
+import AccessTimingForm from "./AccessTimingForm";
 
 export const dynamic = "force-dynamic";
 
@@ -27,39 +26,10 @@ export default async function SettingsPage() {
           isn’t locked out mid-move or while grabbing belongings — reducing attendant call-outs.
         </p>
 
-        <form action={saveAccessTiming} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <label className="lbl" htmlFor="checkoutGraceMinutes">CHECKOUT GRACE (MINUTES)</label>
-              <input
-                id="checkoutGraceMinutes" name="checkoutGraceMinutes" type="number"
-                min={0} max={CHECKOUT_GRACE_MAX} defaultValue={checkout}
-                className="field" style={{ width: "100%", height: 44 }}
-              />
-              <p className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
-                Headroom after checkout. Kept short (max {CHECKOUT_GRACE_MAX}) — the room turns over to the next guest.
-              </p>
-            </div>
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <label className="lbl" htmlFor="transferGraceMinutes">ROOM-TRANSFER GRACE (MINUTES)</label>
-              <input
-                id="transferGraceMinutes" name="transferGraceMinutes" type="number"
-                min={0} max={TRANSFER_GRACE_MAX} defaultValue={transfer}
-                className="field" style={{ width: "100%", height: 44 }}
-              />
-              <p className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
-                Headroom on the old room when a guest moves (max {TRANSFER_GRACE_MAX}).
-              </p>
-            </div>
-          </div>
-          <div>
-            <button type="submit" className="btn btn-primary" style={{ height: 44 }}>Save access timing</button>
-          </div>
-        </form>
+        <AccessTimingForm checkout={checkout} transfer={transfer} />
 
-        <p className="subtle" style={{ fontSize: 11, marginTop: 16, color: "var(--warn-ink)" }}>
-          Note: values are stored now. The revoke-delay behavior is wired separately once the team sets the
-          final timing — until then, codes are revoked immediately regardless of these values.
+        <p className="subtle" style={{ fontSize: 11, marginTop: 16 }}>
+          Applies live to checkout and room-transfer revokes — no redeploy needed. 0 = revoke immediately.
         </p>
       </div>
     </div>

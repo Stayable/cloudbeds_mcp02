@@ -9,25 +9,36 @@ import { CHECKOUT_GRACE_MAX, TRANSFER_GRACE_MAX, clampGrace } from "@/lib/settin
 
 const SINGLETON = "singleton";
 
+export interface AccessTimingState {
+  saved: boolean;
+  checkoutGraceMinutes?: number;
+  transferGraceMinutes?: number;
+  error?: string;
+}
+
 /**
  * Save the Access-timing settings (grace minutes). Gated on settings.manage.
- * Stores values only — the revoke paths will read them once the team sets the
- * final timing (the behavior wiring is a separate, tracked task).
+ * Returns a state for useFormState so the form can show a "Saved" confirmation.
  */
-export async function saveAccessTiming(formData: FormData): Promise<void> {
-  const user = await requirePermission("settings.manage");
-  const checkoutGraceMinutes = clampGrace(formData.get("checkoutGraceMinutes"), CHECKOUT_GRACE_MAX);
-  const transferGraceMinutes = clampGrace(formData.get("transferGraceMinutes"), TRANSFER_GRACE_MAX);
+export async function saveAccessTiming(_prev: AccessTimingState, formData: FormData): Promise<AccessTimingState> {
+  try {
+    const user = await requirePermission("settings.manage");
+    const checkoutGraceMinutes = clampGrace(formData.get("checkoutGraceMinutes"), CHECKOUT_GRACE_MAX);
+    const transferGraceMinutes = clampGrace(formData.get("transferGraceMinutes"), TRANSFER_GRACE_MAX);
 
-  await prisma.appSettings.upsert({
-    where: { id: SINGLETON },
-    create: { id: SINGLETON, checkoutGraceMinutes, transferGraceMinutes },
-    update: { checkoutGraceMinutes, transferGraceMinutes },
-  });
-  await writeAudit(user, {
-    action: "settings_updated",
-    propertyId: "all",
-    detail: buildDetail({ message: `access timing — checkout ${checkoutGraceMinutes}m, transfer ${transferGraceMinutes}m` }),
-  });
-  revalidatePath("/settings");
+    await prisma.appSettings.upsert({
+      where: { id: SINGLETON },
+      create: { id: SINGLETON, checkoutGraceMinutes, transferGraceMinutes },
+      update: { checkoutGraceMinutes, transferGraceMinutes },
+    });
+    await writeAudit(user, {
+      action: "settings_updated",
+      propertyId: "all",
+      detail: buildDetail({ message: `access timing — checkout ${checkoutGraceMinutes}m, transfer ${transferGraceMinutes}m` }),
+    });
+    revalidatePath("/settings");
+    return { saved: true, checkoutGraceMinutes, transferGraceMinutes };
+  } catch (e) {
+    return { saved: false, error: e instanceof Error ? e.message : "Could not save settings" };
+  }
 }

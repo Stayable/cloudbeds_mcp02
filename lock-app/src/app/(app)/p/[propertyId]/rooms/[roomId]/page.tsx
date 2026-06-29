@@ -8,6 +8,7 @@ import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import Forbidden from "@/components/Forbidden";
+import AutoRefresh from "@/components/AutoRefresh";
 import ActionButton from "@/components/ActionButton";
 import ActionForm from "@/components/ActionForm";
 import RevealButton from "./RevealButton";
@@ -77,6 +78,7 @@ export default async function DoorDetailPage({
 
   return (
     <div>
+      <AutoRefresh propertyId={propertyId} />
       <Link href={back.href} className="backlink">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M10 13L5 8l5-5" /></svg>{back.label}
       </Link>

@@ -8,6 +8,7 @@ import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
 import OccupancySyncButton from "@/components/OccupancySyncButton";
 import RoomChangeSyncButton from "@/components/RoomChangeSyncButton";
+import AutoRefresh from "@/components/AutoRefresh";
 import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,7 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
 
   return (
     <div>
+      <AutoRefresh propertyId={propertyId} />
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div className="abbr-badge" style={{ width: 44, height: 44, fontSize: 14 }}>{property.abbr}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
