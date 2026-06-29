@@ -2,8 +2,19 @@ import { describe, it, expect } from "vitest";
 import {
   classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn,
   reconcileDesiredRooms, reservationIdOf, propertyIdOf, passcodeWindowChanged,
-  propertiesToReconcile, activeKeyFor,
+  propertiesToReconcile, activeKeyFor, isCheckout,
 } from "./reservation-intent";
+
+describe("isCheckout", () => {
+  it("is true only for a checked_out status (grace applies)", () => {
+    expect(isCheckout({ event: "reservation/status_changed", status: "checked_out" })).toBe(true);
+  });
+  it("is false for cancel / no-show / deleted (revoke immediately, no grace)", () => {
+    expect(isCheckout({ event: "reservation/status_changed", status: "canceled" })).toBe(false);
+    expect(isCheckout({ event: "reservation/status_changed", status: "no_show" })).toBe(false);
+    expect(isCheckout({ event: "reservation/deleted" })).toBe(false);
+  });
+});
 
 describe("activeKeyFor", () => {
   it("builds a stable <reservationId>:<roomId> dedup key", () => {

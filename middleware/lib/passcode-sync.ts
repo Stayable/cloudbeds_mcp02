@@ -27,13 +27,14 @@ import {
   propertyIdOf,
   isPaidInFull,
   isCheckedIn,
+  isCheckout,
   passcodeWindowChanged,
   activeKeyFor,
   type ReservationWebhookPayload,
 } from "./reservation-intent";
 
 // Re-exported so existing importers (the webhook route) keep working.
-export { classifyIntent, reservationIdOf, propertyIdOf };
+export { classifyIntent, reservationIdOf, propertyIdOf, isCheckout };
 export type { ReservationWebhookPayload };
 
 /** Reservation detail shape used by the create/reconcile paths. */
@@ -49,6 +50,71 @@ export interface SyncResult {
 
 /** PIN length for guest door codes (TTLock supports 4–9 digits). */
 const PIN_LENGTH = 4;
+
+/**
+ * Grace minutes for delayed revoke, from the lock-app's Settings → Access timing
+ * (shared AppSettings row). 0 = revoke immediately. Fails safe to 0 if unset.
+ */
+export async function getGraceSettings(): Promise<{ checkoutGraceMinutes: number; transferGraceMinutes: number }> {
+  const s = await prisma.appSettings.findUnique({ where: { id: "singleton" } });
+  return {
+    checkoutGraceMinutes: s?.checkoutGraceMinutes ?? 0,
+    transferGraceMinutes: s?.transferGraceMinutes ?? 0,
+  };
+}
+
+/**
+ * Pull a guest's PIN — immediately (graceMinutes ≤ 0) or with HEADROOM: instead of
+ * deleting it, shorten its TTLock validity to now+grace and mark it `expiring`, so
+ * the guest isn't locked out mid-move while housekeeping/the front desk catches up.
+ * Either way the activeKey is nulled (frees the dup-guard slot) and the row stops
+ * being the active code. Expiring codes are finalized (hard-deleted) by
+ * sweepExpiredPasscodes once their window passes. Returns what it did.
+ */
+async function revokeOrExpire(
+  pc: { id: string; lockId: bigint; keyboardPwdId: bigint; startTs: bigint },
+  graceMinutes: number,
+): Promise<{ mode: "revoked" | "expiring"; expiresAt: number | null }> {
+  if (graceMinutes <= 0) {
+    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
+    return { mode: "revoked", expiresAt: null };
+  }
+  const expiresAt = Date.now() + graceMinutes * 60_000;
+  try {
+    await changePasscodePeriod({
+      lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId,
+      startDate: Number(pc.startTs), endDate: expiresAt,
+    });
+  } catch {
+    // Best-effort shorten — if the lock is offline we can't change it now. Mark it
+    // expiring anyway so the sweep finalizes deletion once it's reachable. (The
+    // code's original window is the fallback ceiling.)
+  }
+  await prisma.passcode.update({
+    where: { id: pc.id },
+    data: { status: "expiring", endTs: BigInt(expiresAt), activeKey: null },
+  });
+  return { mode: "expiring", expiresAt };
+}
+
+/**
+ * Finalize codes whose grace window has passed: hard-delete them from the lock and
+ * mark them revoked. Run from the reconcile cron. The code is already dead by its
+ * shortened endTs, so a failed delete (offline) just leaves a harmless expired code
+ * on the lock — we still mark it revoked in our records.
+ */
+export async function sweepExpiredPasscodes(): Promise<{ swept: number }> {
+  const now = BigInt(Date.now());
+  const due = await prisma.passcode.findMany({ where: { status: "expiring", endTs: { lt: now } } });
+  let swept = 0;
+  for (const pc of due) {
+    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId }).catch(() => {});
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked" } });
+    swept++;
+  }
+  return { swept };
+}
 
 function generatePin(): string {
   // crypto.randomInt is uniform and avoids Math.random bias for credentials.
@@ -404,12 +470,14 @@ async function createPasscodeForRoom(
 
 /**
  * Revoke every active PIN for a reservation (checkout / cancel / delete).
- * Idempotent: rows already revoked are skipped; a missing TTLock passcode is
- * treated as already gone.
+ * `graceMinutes > 0` (checkout headroom) keeps each code working for that long
+ * instead of deleting it now (see revokeOrExpire); 0 = immediate. Idempotent:
+ * rows already revoked/expiring are skipped (we only fetch active).
  */
 export async function revokePasscodes(
   reservationId: string,
   event: string,
+  graceMinutes = 0,
 ): Promise<SyncResult> {
   const active = await prisma.passcode.findMany({
     where: { reservationId, status: "active" },
@@ -424,14 +492,11 @@ export async function revokePasscodes(
   };
 
   for (const pc of active) {
-    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
-    await prisma.passcode.update({
-      where: { id: pc.id },
-      data: { status: "revoked", activeKey: null },
-    });
+    const { mode, expiresAt } = await revokeOrExpire(pc, graceMinutes);
     result.pinsRevoked++;
 
-    // Guest is leaving — clear occupancy so the room shows vacant in the lock-app.
+    // Guest is leaving — clear occupancy so the room shows vacant in the lock-app
+    // immediately (the code may linger during its grace window, but the room is free).
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
       create: { propertyId: pc.propertyId, roomId: pc.roomId, occupancyStatus: "free" },
@@ -446,7 +511,7 @@ export async function revokePasscodes(
         roomId: pc.roomId,
         lockId: pc.lockId,
         action: "passcode_revoked",
-        detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId) },
+        detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId), mode, graceMinutes, expiresAt },
       },
     });
   }
@@ -489,11 +554,13 @@ export async function reconcilePasscodes(
 
   // 1. Revoke stale — active PINs for this reservation on rooms it no longer
   //    occupies. Runs even if the new room is unmapped (the old code must die).
+  //    Room-transfer grace keeps the OLD room's code working a few more minutes
+  //    so the guest isn't locked out mid-move.
+  const { transferGraceMinutes } = await getGraceSettings();
   const active = await prisma.passcode.findMany({ where: { reservationId, status: "active" } });
   for (const pc of active) {
     if (desiredSet.has(pc.roomId)) continue;
-    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
-    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
+    const { mode, expiresAt } = await revokeOrExpire(pc, transferGraceMinutes);
     result.pinsRevoked++;
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
@@ -504,7 +571,7 @@ export async function reconcilePasscodes(
       data: {
         source: "webhook", event: payload.event, propertyId: pc.propertyId, roomId: pc.roomId, lockId: pc.lockId,
         action: "passcode_revoked",
-        detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change" },
+        detail: { reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change", mode, graceMinutes: transferGraceMinutes, expiresAt },
       },
     });
   }
@@ -569,13 +636,14 @@ export async function reconcileCheckedInReservations(
   result.roomsConsidered = [...byRes.values()].reduce((n, r) => n + r.desired.size, 0);
 
   // 1. Revoke stale — only for reservations we KNOW are still checked in but whose
-  //    PIN is on a room they no longer occupy (definitive room change).
+  //    PIN is on a room they no longer occupy (definitive room change). Room-transfer
+  //    grace keeps the old room's code working a few more minutes.
+  const { transferGraceMinutes } = await getGraceSettings();
   const active = await prisma.passcode.findMany({ where: { propertyId, status: "active" } });
   for (const pc of active) {
     const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
     if (!entry || entry.desired.has(pc.roomId)) continue;
-    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId });
-    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
+    const { mode, expiresAt } = await revokeOrExpire(pc, transferGraceMinutes);
     result.pinsRevoked++;
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
@@ -586,7 +654,7 @@ export async function reconcileCheckedInReservations(
       data: {
         source: "cron", event: "cron/reconcile", propertyId: pc.propertyId, roomId: pc.roomId, lockId: pc.lockId,
         action: "passcode_revoked",
-        detail: { reservationId: pc.reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change_poll" },
+        detail: { reservationId: pc.reservationId, keyboardPwdId: String(pc.keyboardPwdId), reason: "room_change_poll", mode, graceMinutes: transferGraceMinutes, expiresAt },
       },
     });
   }

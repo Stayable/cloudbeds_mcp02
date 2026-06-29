@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
-import { reconcileCheckedInReservations } from "@/lib/passcode-sync";
+import { reconcileCheckedInReservations, sweepExpiredPasscodes } from "@/lib/passcode-sync";
 import { propertiesToReconcile } from "@/lib/reservation-intent";
 import { prisma } from "@/lib/db";
 
@@ -51,9 +51,16 @@ export async function GET(req: Request): Promise<NextResponse> {
         .catch(() => {});
     }
   }
+  // Finalize any grace-period codes whose window has now passed (hard-delete +
+  // mark revoked). Runs once per tick across all properties; cheap when none due.
+  let swept = 0;
+  try {
+    ({ swept } = await sweepExpiredPasscodes());
+  } catch { /* non-fatal — next tick retries */ }
+
   const created = results.reduce((n, r) => n + (r.pinsCreated ?? 0), 0);
   const revoked = results.reduce((n, r) => n + (r.pinsRevoked ?? 0), 0);
   // skipped = configured properties with no locks (or filtered out).
   const skipped = registry.propertyIds().length - targets.length;
-  return NextResponse.json({ ok: true, created, revoked, properties: targets.length, skipped, results });
+  return NextResponse.json({ ok: true, created, revoked, swept, properties: targets.length, skipped, results });
 }

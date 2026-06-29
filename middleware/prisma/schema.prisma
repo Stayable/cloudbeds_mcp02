@@ -77,6 +77,16 @@ model Passcode {
   @@index([reservationId])
 }
 
+// System-wide settings (single row, id="singleton"). Owned/edited by the lock-app
+// (Settings → Access timing); the middleware READS the grace minutes here to delay
+// a guest PIN's revoke on checkout / room transfer. Mirror of the lock-app model.
+model AppSettings {
+  id                   String   @id @default("singleton")
+  checkoutGraceMinutes Int      @default(0)
+  transferGraceMinutes Int      @default(0)
+  updatedAt            DateTime @updatedAt
+}
+
 model EventLog {
   id         String   @id @default(cuid())
   source     String // webhook | admin | field

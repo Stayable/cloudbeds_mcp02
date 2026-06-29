@@ -35,6 +35,10 @@ export interface CodeRow {
 export function classifyCode(p: PasscodeInput, nowMs: number): CodeStatus {
   if (p.status === "revoked") return "revoked";
   if (p.status === "failed") return "revoked";
+  // "expiring" = a code in its grace window after checkout/transfer: logically
+  // gone (room is vacant), still physically working for a few minutes. It must
+  // NOT occupy the active-guest slot, so treat it as expired for display.
+  if (p.status === "expiring") return "expired";
   // endTs 0 marks a permanent (backup) code — never expires by time.
   if (p.endTs > 0 && p.endTs < nowMs) return "expired";
   return "active";

@@ -110,12 +110,16 @@ ROOM-CHANGE AUTO PLAN (2026-06-30):
 - [x] CRON */5 LIVE 2026-06-30 (Pro) — vercel.json bumped, middleware auto-deployed.
 
 NEW BACKLOG (2026-06-30, from BK — captured, NOT yet built):
-- [~] ⭐ GRACE PERIOD / revoke-delay. SETTINGS SHIPPED 2026-06-30 (Settings → Access timing: checkout grace
-      max 60m + transfer grace max 240m, AppSettings singleton model pushed to Neon, settings.manage-gated page
-      + sidebar link). Default 0 = revoke immediately (no behavior change yet). SAFETY RULE DROPPED per BK
-      (meeting will decide best timing). REMAINING: wire the middleware revoke paths (checkout/transfer) to read
-      AppSettings + shorten the PIN expiry via changePasscodePeriod (now+grace) instead of deleting — AFTER the
-      team sets timing. (Add AppSettings to middleware schema when wiring.)
+- [x] ⭐ GRACE PERIOD / revoke-delay FULLY WIRED 2026-06-30, SET TO 10m BOTH (checkout + transfer; prod
+      AppSettings row upserted to 10/10). Mechanism: revokeOrExpire() — grace>0 shortens the PIN's TTLock
+      window to now+grace via changePasscodePeriod + marks it status="expiring" (activeKey nulled, room freed
+      immediately); grace=0 = delete now (unchanged). sweepExpiredPasscodes() in the /5 cron hard-deletes +
+      revokes expiring codes past their window. Checkout grace fires on status checked_out only (isCheckout,
+      TDD); cancel/no-show/deleted + un-check-in = immediate. Room-transfer grace fires in both reconcile revoke
+      loops (webhook + cron). AppSettings added to MIDDLEWARE schema (reads via getGraceSettings, fallback 0).
+      lock-app door-detail treats "expiring" as not-the-active-code (shows in history; TDD). NO safety rule
+      (per BK) — during a checkout/transfer grace window the old code still works even if a new guest checks into
+      that room; revisit if turnover ever overlaps <10m.
 - [x] TEST re-sync button SHIPPED 2026-06-30 (per-property DASHBOARD, lock.sync-gated, labeled TEST): calls the
       middleware /api/cron/reconcile?propertyId= on demand so a room change is picked up now without waiting for
       the (daily-on-Hobby) cron. room-sync-actions.ts + RoomChangeSyncButton.tsx. Becomes redundant once the */5

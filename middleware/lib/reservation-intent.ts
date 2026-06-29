@@ -42,6 +42,15 @@ export function propertyIdOf(p: ReservationWebhookPayload): string {
 const REMOVED_STATUSES = new Set(["canceled", "cancelled", "checked_out", "no_show"]);
 
 /**
+ * True when this revoke is a normal CHECKOUT (status checked_out) — the case that
+ * earns a grace period (let the departing guest grab belongings). Cancel/no-show/
+ * deleted are NOT checkouts: revoke those immediately (no one to give headroom to).
+ */
+export function isCheckout(payload: ReservationWebhookPayload): boolean {
+  return (payload.status ?? "").toLowerCase() === "checked_out";
+}
+
+/**
  * Decide what a given event implies for this reservation's codes.
  *
  * Cloudbeds tracks check-in at the GUEST level (`guestStatus`); the

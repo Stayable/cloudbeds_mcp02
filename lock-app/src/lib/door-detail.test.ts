@@ -20,6 +20,22 @@ describe("classifyCode", () => {
   it("treats a permanent backup code (endTs 0) as active", () => {
     expect(classifyCode({ ...base, type: "backup", endTs: 0 }, NOW)).toBe("active");
   });
+  it("treats an 'expiring' (grace, winding-down) code as not-active", () => {
+    // status expiring = logically revoked, physically lingering during its grace
+    // window — must NOT show as the room's active guest code.
+    expect(classifyCode({ ...base, status: "expiring", endTs: NOW + 600_000 }, NOW)).toBe("expired");
+  });
+});
+
+describe("splitCodes with an expiring code", () => {
+  it("keeps an expiring guest code out of the active slot (sends it to history)", () => {
+    const rows: PasscodeInput[] = [
+      { ...base, keyboardPwdId: "exp", status: "expiring", endTs: NOW + 600_000 },
+    ];
+    const out = splitCodes(rows, NOW);
+    expect(out.guest).toBeNull();
+    expect(out.history.map((h) => h.keyboardPwdId)).toContain("exp");
+  });
 });
 
 describe("splitCodes", () => {

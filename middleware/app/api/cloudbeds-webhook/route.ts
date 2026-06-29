@@ -7,6 +7,8 @@ import {
   reconcilePasscodes,
   reservationIdOf,
   propertyIdOf,
+  getGraceSettings,
+  isCheckout,
   type ReservationWebhookPayload,
 } from "@/lib/passcode-sync";
 import { prisma } from "@/lib/db";
@@ -73,12 +75,17 @@ export async function POST(req: Request) {
   //    Cloudbeds retries; the sync layer is idempotent, so a retry is safe.
   try {
     const registry = CloudbedsRegistry.fromEnv();
-    const result =
-      intent === "revoke"
-        ? await revokePasscodes(reservationId, payload.event)
-        : intent === "reconcile"
-          ? await reconcilePasscodes(registry, payload)
-          : await ensurePasscodes(registry, payload);
+    let result;
+    if (intent === "revoke") {
+      // A real checkout earns the configured grace headroom; cancel / no-show /
+      // deleted revoke immediately (no guest to give headroom to).
+      const grace = isCheckout(payload) ? (await getGraceSettings()).checkoutGraceMinutes : 0;
+      result = await revokePasscodes(reservationId, payload.event, grace);
+    } else if (intent === "reconcile") {
+      result = await reconcilePasscodes(registry, payload);
+    } else {
+      result = await ensurePasscodes(registry, payload);
+    }
 
     return Response.json({ ok: true, intent, result });
   } catch (err: any) {
