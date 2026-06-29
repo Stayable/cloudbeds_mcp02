@@ -638,7 +638,23 @@ export async function reconcileCheckedInReservations(
   for (const detail of reservations) {
     const rid = detail.reservationID != null ? String(detail.reservationID) : "";
     if (!rid) continue;
-    byRes.set(rid, { detail, desired: new Set(extractRoomIds(detail)) });
+    let full = detail;
+    let rooms = extractRoomIds(detail);
+    // After a room MOVE, the getReservations LIST row comes back with the room
+    // assignment BLANK (the single getReservation is what's fresh). Without this
+    // fallback the reconcile sees no rooms and never moves the code — even though
+    // occupancy sync (which has this fallback) already moved the guest. Mirror it:
+    // when the list row carries no room, fetch the reservation for the true room.
+    if (rooms.length === 0) {
+      try {
+        const fetched = await getReservation(registry, propertyId, rid);
+        full = { ...detail, ...fetched };
+        rooms = extractRoomIds(full);
+      } catch {
+        /* keep empty — conservative; we won't falsely revoke without a known room */
+      }
+    }
+    byRes.set(rid, { detail: full, desired: new Set(rooms) });
   }
   result.roomsConsidered = [...byRes.values()].reduce((n, r) => n + r.desired.size, 0);
 
@@ -649,7 +665,10 @@ export async function reconcileCheckedInReservations(
   const active = await prisma.passcode.findMany({ where: { propertyId, status: "active" } });
   for (const pc of active) {
     const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
-    if (!entry || entry.desired.has(pc.roomId)) continue;
+    // Skip unless we POSITIVELY know this reservation's current rooms (non-empty)
+    // and this PIN's room isn't among them. If desired is empty (couldn't resolve
+    // the room), do NOT revoke — never strand a guest with no code on an unknown room.
+    if (!entry || entry.desired.size === 0 || entry.desired.has(pc.roomId)) continue;
     const { mode, expiresAt } = await revokeOrExpire(pc, transferGraceMinutes);
     result.pinsRevoked++;
     await prisma.roomState.upsert({
