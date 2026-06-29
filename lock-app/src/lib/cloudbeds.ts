@@ -60,6 +60,42 @@ export class CloudbedsClient {
     }
     return json ?? ({ success: true } as CloudbedsResponse<T>);
   }
+
+  /** Form-encoded POST (write). The lock-app keys carry Reservation R+W scope. */
+  async post<T = unknown>(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<CloudbedsResponse<T>> {
+    const clean: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null || v === "") continue;
+      clean[k] = typeof v === "string" ? v : String(v);
+    }
+    const res = await fetch(`${this.baseUrl}/${method}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "x-api-key": this.apiKey,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(clean).toString(),
+      signal: AbortSignal.timeout(6000),
+    });
+    const text = await res.text();
+    let json: CloudbedsResponse<T> | undefined;
+    try {
+      json = text ? (JSON.parse(text) as CloudbedsResponse<T>) : undefined;
+    } catch {
+      /* non-JSON error body */
+    }
+    if (!res.ok) {
+      throw new Error(json?.message ?? text?.slice(0, 300) ?? `Cloudbeds HTTP ${res.status}`);
+    }
+    if (json && json.success === false) {
+      throw new Error(json.message ?? "Cloudbeds returned success=false");
+    }
+    return json ?? ({ success: true } as CloudbedsResponse<T>);
+  }
 }
 
 /** Routes each call to the right per-property API key. */
@@ -240,6 +276,23 @@ export async function getReservation(
     reservationID: reservationId,
   });
   return (res.data ?? {}) as ReservationDetail;
+}
+
+/** Post a note onto a Cloudbeds reservation (e.g. the door-code token). Mirrors
+ *  middleware's postReservationNote. No-ops if no key for the property. */
+export async function postReservationNote(
+  registry: CloudbedsRegistry,
+  propertyId: string,
+  reservationId: string,
+  note: string,
+): Promise<void> {
+  const client = registry.resolve(propertyId);
+  if (!client) return;
+  await client.post("postReservationNote", {
+    propertyID: propertyId,
+    reservationID: reservationId,
+    reservationNote: note,
+  });
 }
 
 /** Fetch one guest's contact record. Returns null if no key for the property. */

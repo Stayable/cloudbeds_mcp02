@@ -130,13 +130,20 @@ function generatePin(): string {
  * on both ends (the code is live a little early and a little late) — acceptable
  * for v1. Precise property-timezone check-in/out times are a tracked follow-up.
  */
+// Pad the UTC end-of-departure-day to cover the full US Eastern (Florida) checkout
+// day. end = departure 23:59:59 UTC is only ~7:59pm Eastern, so codes read as
+// expired in the checkout-day evening (and a same-day stay looked expired the
+// instant it was issued). +5h covers EST to local midnight; EDT gets ~1h extra.
+// Mirrors lock-app's EASTERN_END_PAD_MS — keep the two in sync.
+const EASTERN_END_PAD_MS = 5 * 60 * 60 * 1000;
+
 function validityWindow(startDate?: string, endDate?: string): { startTs: number; endTs: number } {
   const start = startDate ? Date.parse(`${startDate}T00:00:00Z`) : NaN;
   const end = endDate ? Date.parse(`${endDate}T23:59:59Z`) : NaN;
   if (Number.isNaN(start) || Number.isNaN(end)) {
     throw new Error(`Invalid reservation date range: start=${startDate} end=${endDate}`);
   }
-  return { startTs: start, endTs: end };
+  return { startTs: start, endTs: end + EASTERN_END_PAD_MS };
 }
 
 /**

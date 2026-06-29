@@ -13,7 +13,7 @@ import ActionForm from "@/components/ActionForm";
 import RevealButton from "./RevealButton";
 import {
   revealGuestCode, revokeGuestCode, generateManualCode,
-  revealBackupCode, rotateBackupCode, syncFromLock,
+  revealBackupCode, rotateBackupCode, syncFromLock, resendGuestCode,
 } from "./actions";
 import { assignLockToRoom, unmapRoom } from "@/app/(app)/lock-actions";
 
@@ -115,9 +115,25 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                     />
                   )}
                 </div>
+                {can("guest_code.generate_manual") && state?.currentReservationId && (
+                  <div style={{ marginTop: 12 }}>
+                    <RevealButton variant="onLight" label="Resend code (new PIN)" action={async () => { "use server"; return resendGuestCode(propertyId, roomId); }} />
+                    <p className="subtle" style={{ fontSize: 11, marginTop: 6 }}>Issues a fresh code valid through checkout and re-posts it to Cloudbeds.</p>
+                  </div>
+                )}
                 {guest.reservationId && <div className="subtle" style={{ marginTop: 10, fontSize: 12 }}>Reservation {guest.reservationId}</div>}
               </>
-            ) : <p className="subtle">No active guest code.</p>}
+            ) : (
+              <>
+                <p className="subtle">No active guest code.</p>
+                {can("guest_code.generate_manual") && map && state?.currentReservationId && (
+                  <div style={{ marginTop: 12 }}>
+                    <RevealButton variant="onLight" label="Resend code" action={async () => { "use server"; return resendGuestCode(propertyId, roomId); }} />
+                    <p className="subtle" style={{ fontSize: 11, marginTop: 6 }}>Issues a code for the current guest and posts it to Cloudbeds.</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="card">

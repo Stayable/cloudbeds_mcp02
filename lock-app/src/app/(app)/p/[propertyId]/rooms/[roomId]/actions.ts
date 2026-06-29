@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
 import { createPasscode, deletePasscode, listPasscodes } from "@/lib/ttlock";
-import { generatePin, manualValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
+import { generatePin, manualValidityWindow, guestValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
 import { BACKUP_SLOTS } from "@/lib/door-detail";
+import { CloudbedsRegistry, getReservation, postReservationNote } from "@/lib/cloudbeds";
 import { detectDrift } from "@/lib/reconcile";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
@@ -51,6 +52,86 @@ export async function revokeGuestCode(propertyId: string, roomId: string): Promi
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true };
+}
+
+/**
+ * Resend the guest door code for this room's current reservation: clear any
+ * existing guest code and issue a FRESH one with a valid (timezone-correct) window,
+ * then re-post the `<lock>-<PIN>` note to Cloudbeds. Use when a guest didn't get the
+ * code or it expired. Returns the new PIN so the desk can read it out.
+ */
+export async function resendGuestCode(propertyId: string, roomId: string): Promise<ActionResult<{ pin: string }>> {
+  const user = await requirePermission("guest_code.generate_manual", propertyId);
+
+  const map = await prisma.lockMap.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } });
+  if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
+
+  const state = await prisma.roomState.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } });
+  const reservationId = state?.currentReservationId;
+  if (!reservationId) return { ok: false, error: "No current reservation on this room — nothing to resend." };
+
+  const registry = CloudbedsRegistry.fromEnv();
+  let reservation;
+  try {
+    reservation = await getReservation(registry, propertyId, reservationId);
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
+  if (!reservation) return { ok: false, error: `No Cloudbeds key for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId}.` };
+  let window: { startTs: number; endTs: number };
+  try {
+    window = guestValidityWindow(reservation.startDate, reservation.endDate);
+  } catch {
+    return { ok: false, error: "This reservation has no valid stay dates in Cloudbeds." };
+  }
+
+  // Clear any existing guest code (active or in its grace window) so we don't double
+  // up — delete on the lock best-effort, free the dup-guard slot.
+  const old = await prisma.passcode.findMany({
+    where: { propertyId, roomId, type: "guest", status: { in: ["active", "expiring"] } },
+  });
+  for (const pc of old) {
+    await deletePasscode({ lockId: pc.lockId, keyboardPwdId: pc.keyboardPwdId }).catch(() => {});
+    await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
+  }
+
+  const pin = generatePin();
+  let keyboardPwdId: number;
+  try {
+    ({ keyboardPwdId } = await createPasscode({
+      lockId: map.lockId, passcode: pin, keyboardPwdType: PERIOD_PWD_TYPE,
+      startDate: window.startTs, endDate: window.endTs, name: `Res ${reservationId}`,
+    }));
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
+  try {
+    await prisma.passcode.create({
+      data: {
+        reservationId, propertyId, roomId, lockId: map.lockId,
+        keyboardPwdId: BigInt(keyboardPwdId), pin,
+        startTs: BigInt(window.startTs), endTs: BigInt(window.endTs),
+        status: "active", type: "guest", activeKey: `${reservationId}:${roomId}`,
+      },
+    });
+  } catch (e: any) {
+    if (e?.code === "P2002") {
+      // The middleware issued one concurrently — drop our spare lock code.
+      await deletePasscode({ lockId: map.lockId, keyboardPwdId }).catch(() => {});
+      return { ok: false, error: "A code was just issued for this room — refresh to see it." };
+    }
+    throw e;
+  }
+
+  const label = map.alias?.trim() || map.roomName?.trim() || roomId;
+  await postReservationNote(registry, propertyId, reservationId, `${label}-${pin}`).catch(() => {});
+
+  await writeAudit(user, {
+    action: "guest_code_resent", propertyId, roomId, lockId: map.lockId,
+    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId) } }),
+  });
+  revalidatePath(detailPath(propertyId, roomId));
+  return { ok: true, data: { pin } };
 }
 
 /** Generate a manual (no-reservation) period code valid for `hours` from now. */

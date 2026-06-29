@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  generatePin, guestValidityWindow, manualValidityWindow, PIN_LENGTH,
+  generatePin, guestValidityWindow, manualValidityWindow, PIN_LENGTH, EASTERN_END_PAD_MS,
 } from "./passcodes";
 
 describe("generatePin", () => {
@@ -19,10 +19,19 @@ describe("generatePin", () => {
 });
 
 describe("guestValidityWindow", () => {
-  it("opens at UTC start-of-arrival and closes at UTC end-of-departure", () => {
-    const { startTs, endTs } = guestValidityWindow("2026-06-20", "2026-06-22");
+  it("opens at UTC start-of-arrival", () => {
+    const { startTs } = guestValidityWindow("2026-06-20", "2026-06-22");
     expect(startTs).toBe(Date.parse("2026-06-20T00:00:00Z"));
-    expect(endTs).toBe(Date.parse("2026-06-22T23:59:59Z"));
+  });
+  it("closes at end-of-departure-day padded to cover the US Eastern local day", () => {
+    const { endTs } = guestValidityWindow("2026-06-20", "2026-06-22");
+    expect(endTs).toBe(Date.parse("2026-06-22T23:59:59Z") + EASTERN_END_PAD_MS);
+  });
+  it("keeps a code checking out today valid through the evening Eastern (the expiry bug)", () => {
+    // 9pm EDT on the checkout day = next-day 01:00 UTC. A UTC-only end (23:59:59Z)
+    // would already read expired; the Eastern pad keeps it valid.
+    const { endTs } = guestValidityWindow("2026-06-30", "2026-06-30");
+    expect(endTs).toBeGreaterThan(Date.parse("2026-07-01T01:00:00Z"));
   });
   it("throws on an invalid range", () => {
     expect(() => guestValidityWindow(undefined, "2026-06-22")).toThrow();

@@ -109,6 +109,20 @@ ROOM-CHANGE AUTO PLAN (2026-06-30):
       (TDD). Grace-compatible: an `expiring` code = activeKey null, so it never blocks the new active code.
 - [x] CRON */5 LIVE 2026-06-30 (Pro) — vercel.json bumped, middleware auto-deployed.
 
+- [x] CODE-EXPIRED BUG FIX + RESEND BUTTON (2026-06-30). ROOT CAUSE: validity window ended at departure
+      23:59:59 **UTC** = ~7:59pm Eastern, so codes read expired in the checkout-day evening (and a same-day
+      stay looked expired the instant it was issued). FIX: pad the window end by EASTERN_END_PAD_MS (+5h) in
+      BOTH window fns (lock-app guestValidityWindow + middleware validityWindow) → covers the full Florida
+      local checkout day (TDD). NOTE: next reconcile auto-extends existing codes' windows via the
+      window-change path. RESEND BUTTON: room detail guest card "Resend code (new PIN)" (guest_code.generate_manual,
+      occupied rooms) → resendGuestCode action: clears any guest code, issues a FRESH one with the corrected
+      window, re-posts <lock>-<PIN> note to Cloudbeds, shows the new PIN (RevealButton). Added post()+
+      postReservationNote() to the lock-app Cloudbeds client (was read-only; keys have Reservation R+W).
+      EMAIL_FROM default → admin@rentstayable.com (BK set the Vercel env too).
+- [ ] STILL OPEN: confirm the "expired" repro is fixed on retest (BK retesting). If a guest still sees expired,
+      capture where (lock keypad vs app) + reservation dates — may need a true property-timezone window, not the
+      +5h pad. Also confirm lock-middleware is Git-connected (deploys from pushes) — was unverified.
+
 NEW BACKLOG (2026-06-30, from BK — captured, NOT yet built):
 - [x] ⭐ GRACE PERIOD / revoke-delay FULLY WIRED 2026-06-30, SET TO 10m BOTH (checkout + transfer; prod
       AppSettings row upserted to 10/10). Mechanism: revokeOrExpire() — grace>0 shortens the PIN's TTLock

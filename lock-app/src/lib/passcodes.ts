@@ -18,14 +18,23 @@ export function generatePin(length: number = PIN_LENGTH): string {
   return String(randomInt(min, max));
 }
 
-/** Guest window: UTC start-of-arrival → end-of-departure (mirrors middleware). */
+/**
+ * Pad the UTC end-of-departure-day so a code covers the full US Eastern (Florida)
+ * checkout day. Without this, end = departure 23:59:59 UTC = ~7:59pm Eastern, so a
+ * code read as EXPIRED in the evening of the checkout day (and a same-day stay
+ * looked expired the moment it was issued). +5h covers EST (UTC-5) to local
+ * midnight; EDT (UTC-4) gets ~1h extra — acceptably generous. Mirrors middleware.
+ */
+export const EASTERN_END_PAD_MS = 5 * 60 * 60 * 1000;
+
+/** Guest window: UTC start-of-arrival → end-of-departure (+Eastern pad). */
 export function guestValidityWindow(startDate?: string, endDate?: string): { startTs: number; endTs: number } {
   const startTs = startDate ? Date.parse(`${startDate}T00:00:00Z`) : NaN;
-  const endTs = endDate ? Date.parse(`${endDate}T23:59:59Z`) : NaN;
-  if (Number.isNaN(startTs) || Number.isNaN(endTs)) {
+  const endBase = endDate ? Date.parse(`${endDate}T23:59:59Z`) : NaN;
+  if (Number.isNaN(startTs) || Number.isNaN(endBase)) {
     throw new Error(`Invalid reservation date range: start=${startDate} end=${endDate}`);
   }
-  return { startTs, endTs };
+  return { startTs, endTs: endBase + EASTERN_END_PAD_MS };
 }
 
 /** Manual window: now → now + hours. */
