@@ -2,7 +2,27 @@ import { describe, it, expect } from "vitest";
 import {
   classifyIntent, reservationNoteBody, isPaidInFull, isCheckedIn,
   reconcileDesiredRooms, reservationIdOf, propertyIdOf, passcodeWindowChanged,
+  propertiesToReconcile,
 } from "./reservation-intent";
+
+describe("propertiesToReconcile", () => {
+  const all = ["210972", "208155", "210986"];
+  const withLocks = new Set(["210972"]); // only Lakeland has mapped locks today
+
+  it("reconciles only properties that have at least one mapped lock", () => {
+    expect(propertiesToReconcile(all, withLocks)).toEqual(["210972"]);
+  });
+  it("returns empty when no property has locks", () => {
+    expect(propertiesToReconcile(all, new Set())).toEqual([]);
+  });
+  it("narrows to a single property when a filter is given (still must have locks)", () => {
+    expect(propertiesToReconcile(all, new Set(["210972", "208155"]), "208155")).toEqual(["208155"]);
+    expect(propertiesToReconcile(all, withLocks, "208155")).toEqual([]); // filtered prop has no locks
+  });
+  it("ignores a filter that isn't a configured property", () => {
+    expect(propertiesToReconcile(all, withLocks, "999999")).toEqual([]);
+  });
+});
 
 describe("passcodeWindowChanged", () => {
   // A stay extension keeps the SAME PIN but moves the checkout date — we must

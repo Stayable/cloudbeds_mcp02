@@ -117,6 +117,22 @@ export function isPaidInFull(balance: number | string | null | undefined): boole
 }
 
 /**
+ * Which properties the poll-reconcile cron should actually hit. A property with
+ * no mapped locks can't have a PIN to reconcile, so calling Cloudbeds for it is
+ * wasted API load — skip it (big win during rollout, when most properties have no
+ * locks yet). An optional `filter` narrows to a single property for testing; it
+ * still must have locks. Pure so it's unit-testable away from Prisma.
+ */
+export function propertiesToReconcile(
+  allPropertyIds: string[],
+  propertyIdsWithLocks: Set<string>,
+  filter?: string | null,
+): string[] {
+  const ids = filter ? allPropertyIds.filter((id) => id === filter) : allPropertyIds;
+  return ids.filter((id) => propertyIdsWithLocks.has(id));
+}
+
+/**
  * True if a reservation's desired validity window differs from the window an
  * existing PIN was issued for. A stay extension (the common transient/long-term
  * case) keeps the same reservation+room — so we must NOT mint a new PIN — but the

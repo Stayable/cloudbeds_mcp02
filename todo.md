@@ -84,6 +84,19 @@ docs/superpowers/specs/2026-06-29-lock-app-gateway-status-and-graceful-errors-de
   locks); lock-detail + room-detail cards show the connected gateway (name+status) linked. gateway-view.ts.
 - VERIFY LIVE (sandbox can't reach TTLock): run Sync → gateways populate; open Lakeland 239 → "not connected"
   + generating a code shows the friendly modal, no crash; lock 238 → rapid rotate locks the button.
+
+ROOM-CHANGE AUTO PLAN (2026-06-30):
+- Webhook does NOT fire on a pure room change for these accounts → caught only by the poll-reconcile cron
+  (/api/cron/reconcile → reconcileCheckedInReservations). Cron is DAILY on Hobby; needs Vercel PRO ($20/mo,
+  BK requesting from Rob) to run sub-daily. Fastest Vercel cron = */1 (every minute); recommend */2.
+- LEVER 1 DONE (2026-06-30): cron now skips properties with no mapped locks (pure propertiesToReconcile,
+  TDD) → today only Lakeland is polled (1 Cloudbeds call/run vs 8). Added ?propertyId= filter for single-prop
+  tests. Files: middleware/lib/reservation-intent.ts + app/api/cron/reconcile/route.ts. Steady-state cost =
+  ~1 getReservations/property/run (rooms inline; no PIN change → DB-only after).
+- ON PRO (do in order): (1) set CRON_SECRET on lock-middleware; (2) bump vercel.json cron to `*/2 * * * *`
+  (NOT before Pro — Hobby rejects sub-daily crons and freezes the deploy); (3) run
+  register-accommodation-webhooks.ts --apply + verify the event actually delivers — if it does, relax the cron
+  to ~30 min (event-driven primary + cron backstop, near-zero API load).
 - [ ] **User Logs** — a view of actions taken within the dashboards, per user (EventLog already stores
       actorUserId/actorEmail/actorRole). CLARIFY w/ BK: dedicated "User Logs" page vs a user filter on the existing
       Activity page.
