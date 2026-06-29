@@ -9,6 +9,7 @@ import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
+import { mapActionError, type ActionResult } from "@/lib/action-result";
 
 /** Revalidate the room detail, devices list, and the lock detail after a change. */
 function revalidateLockSurfaces(propertyId: string, roomId: string | null, lockId: bigint): void {
@@ -25,26 +26,30 @@ function revalidateLockSurfaces(propertyId: string, roomId: string | null, lockI
  * to canonical `<ABBR>-<room>` so its name follows the app, create the mapping,
  * drop any other rows for this lock, and clear it from the pool/queue.
  */
-export async function assignLockToRoom(formData: FormData): Promise<void> {
+export async function assignLockToRoom(formData: FormData): Promise<ActionResult> {
   const propertyId = String(formData.get("propertyId") ?? "").trim();
   const roomId = String(formData.get("roomId") ?? "").trim();
   const lockIdRaw = String(formData.get("lockId") ?? "").trim();
-  if (!propertyId || !roomId) throw new Error("Missing propertyId or roomId");
-  if (!/^\d+$/.test(lockIdRaw)) throw new Error("Pick a lock to assign");
+  if (!propertyId || !roomId) return { ok: false, error: "Missing room information — reload the page and try again." };
+  if (!/^\d+$/.test(lockIdRaw)) return { ok: false, error: "Pick a lock to assign." };
   const user = await requirePermission("mapping.edit", propertyId);
   const lockId = BigInt(lockIdRaw);
 
   const index = await loadRoomIndex(CloudbedsRegistry.fromEnv(), propertyId);
   if (!index) {
-    throw new Error(`No Cloudbeds key for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} so rooms can be resolved.`);
+    return { ok: false, error: `No Cloudbeds key for property ${propertyId} — add CLOUDBEDS_API_KEY_${propertyId} so rooms can be resolved.` };
   }
   const roomNumber = resolveNameFromId(index, roomId);
-  if (!roomNumber) throw new Error(`Room ${roomId} is not a current Cloudbeds room for this property.`);
+  if (!roomNumber) return { ok: false, error: `Room ${roomId} is not a current Cloudbeds room for this property.` };
   const name = canonicalLockName(propertyId, roomNumber);
-  if (!name) throw new Error("Unknown property or empty room");
+  if (!name) return { ok: false, error: "Unknown property or empty room." };
 
   // Rename in TTLock first — a failure here leaves nothing half-assigned.
-  await renameLock(lockId, name);
+  try {
+    await renameLock(lockId, name);
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   await prisma.lockMap.upsert({
     where: { propertyId_roomId: { propertyId, roomId } },
     create: { propertyId, roomId, roomName: roomNumber, lockId, alias: name },
@@ -57,6 +62,7 @@ export async function assignLockToRoom(formData: FormData): Promise<void> {
     detail: buildDetail({ message: `assigned + renamed to ${name} (room ${roomNumber} → ${roomId})`, extra: { to: String(lockId), name } }),
   });
   revalidateLockSurfaces(propertyId, roomId, lockId);
+  return { ok: true };
 }
 
 /**
@@ -66,15 +72,19 @@ export async function assignLockToRoom(formData: FormData): Promise<void> {
  * lock then lives in the property's available pool (UnassignedLock). Codes already
  * on the physical lock are untouched.
  */
-export async function unmapRoom(propertyId: string, roomId: string): Promise<void> {
+export async function unmapRoom(propertyId: string, roomId: string): Promise<ActionResult> {
   const user = await requirePermission("mapping.edit", propertyId);
   const existing = await prisma.lockMap.findUnique({
     where: { propertyId_roomId: { propertyId, roomId } },
   });
-  if (!existing) return;
+  if (!existing) return { ok: true };
 
   const unassignedName = unassignedLockName(propertyId) ?? "(unassigned)";
-  await renameLock(existing.lockId, unassignedName); // first: a failure aborts before we drop a good mapping
+  try {
+    await renameLock(existing.lockId, unassignedName); // first: a failure aborts before we drop a good mapping
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   await prisma.lockMap.delete({ where: { propertyId_roomId: { propertyId, roomId } } });
   await prisma.unassignedLock.upsert({
     where: { lockId: existing.lockId },
@@ -86,4 +96,5 @@ export async function unmapRoom(propertyId: string, roomId: string): Promise<voi
     detail: buildDetail({ message: `unmapped + renamed to "${unassignedName}"`, extra: { from: String(existing.lockId) } }),
   });
   revalidateLockSurfaces(propertyId, roomId, existing.lockId);
+  return { ok: true };
 }

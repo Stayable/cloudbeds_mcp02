@@ -39,6 +39,24 @@ model UnassignedLock {
   battery      Int?
   online       Boolean   @default(true)
   lastSeen     DateTime?
+  gatewayId    BigInt? // primary gateway this lock reaches (set by gateway-sync)
+  discoveredAt DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// TTLock gateways (WiFi bridges). Account-global like locks — one TTLock account
+// owns all of them, so keyed by the global gatewayId. propertyId is INFERRED from
+// the locks the gateway serves (a gateway physically sits at one property). Synced
+// from TTLock by gateway-sync.ts; never edited by hand.
+model Gateway {
+  gatewayId    BigInt    @id
+  name         String
+  propertyId   String? // inferred from served locks; null until it serves a known lock
+  online       Boolean   @default(false)
+  lockCount    Int? // TTLock lockNum (locks bound to the gateway)
+  networkName  String?
+  model        String?
+  lastSeen     DateTime?
   discoveredAt DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }

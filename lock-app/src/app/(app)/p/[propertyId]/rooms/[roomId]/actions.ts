@@ -9,64 +9,76 @@ import { BACKUP_SLOTS } from "@/lib/door-detail";
 import { detectDrift } from "@/lib/reconcile";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
+import { mapActionError, type ActionResult } from "@/lib/action-result";
 
 function detailPath(propertyId: string, roomId: string): string {
   return `/p/${propertyId}/rooms/${roomId}`;
 }
 
 /** Reveal the active guest PIN (logged, amber). Returns the raw value to the caller. */
-export async function revealGuestCode(propertyId: string, roomId: string): Promise<{ pin: string }> {
+export async function revealGuestCode(propertyId: string, roomId: string): Promise<ActionResult<{ pin: string }>> {
   const user = await requirePermission("guest_code.reveal", propertyId);
   const code = await prisma.passcode.findFirst({
     where: { propertyId, roomId, type: "guest", status: "active" },
     orderBy: { createdAt: "desc" },
   });
-  if (!code) throw new Error("No active guest code for this room");
+  if (!code) return { ok: false, error: "There’s no active guest code for this room." };
   await writeAudit(user, {
     action: "code_revealed", propertyId, roomId, lockId: code.lockId,
     detail: buildDetail({ outcome: "warning", reservationId: code.reservationId ?? undefined }),
   });
-  return { pin: code.pin };
+  return { ok: true, data: { pin: code.pin } };
 }
 
 /** Revoke the active guest PIN: delete on the lock, mark revoked, log. */
-export async function revokeGuestCode(propertyId: string, roomId: string): Promise<void> {
+export async function revokeGuestCode(propertyId: string, roomId: string): Promise<ActionResult> {
   const user = await requirePermission("guest_code.revoke", propertyId);
   const code = await prisma.passcode.findFirst({
     where: { propertyId, roomId, type: "guest", status: "active" },
     orderBy: { createdAt: "desc" },
   });
-  if (!code) throw new Error("No active guest code to revoke");
-  await deletePasscode({ lockId: code.lockId, keyboardPwdId: code.keyboardPwdId });
+  if (!code) return { ok: false, error: "There’s no active guest code to revoke." };
+  try {
+    await deletePasscode({ lockId: code.lockId, keyboardPwdId: code.keyboardPwdId });
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   await prisma.passcode.update({ where: { id: code.id }, data: { status: "revoked" } });
   await writeAudit(user, {
     action: "guest_code_revoked", propertyId, roomId, lockId: code.lockId,
     detail: buildDetail({ reservationId: code.reservationId ?? undefined }),
   });
   revalidatePath(detailPath(propertyId, roomId));
+  return { ok: true };
 }
 
 /** Generate a manual (no-reservation) period code valid for `hours` from now. */
-export async function generateManualCode(formData: FormData): Promise<void> {
+export async function generateManualCode(formData: FormData): Promise<ActionResult> {
   const propertyIdRaw = formData.get("propertyId");
   const roomIdRaw = formData.get("roomId");
-  if (!propertyIdRaw || !roomIdRaw) throw new Error("Missing propertyId or roomId");
+  if (!propertyIdRaw || !roomIdRaw) return { ok: false, error: "Missing room information — reload the page and try again." };
   const propertyId = String(propertyIdRaw);
   const roomId = String(roomIdRaw);
   const hours = Number(formData.get("hours") ?? 24);
+  if (!(hours > 0)) return { ok: false, error: "Enter a positive number of hours." };
   const user = await requirePermission("guest_code.generate_manual", propertyId);
 
   const map = await prisma.lockMap.findUnique({
     where: { propertyId_roomId: { propertyId, roomId } },
   });
-  if (!map) throw new Error("Room is not mapped to a lock");
+  if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
 
   const pin = generatePin();
   const { startTs, endTs } = manualValidityWindow(Date.now(), hours);
-  const { keyboardPwdId } = await createPasscode({
-    lockId: map.lockId, passcode: pin, keyboardPwdType: PERIOD_PWD_TYPE,
-    startDate: startTs, endDate: endTs, name: "Manual",
-  });
+  let keyboardPwdId: number;
+  try {
+    ({ keyboardPwdId } = await createPasscode({
+      lockId: map.lockId, passcode: pin, keyboardPwdType: PERIOD_PWD_TYPE,
+      startDate: startTs, endDate: endTs, name: "Manual",
+    }));
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   await prisma.passcode.create({
     data: {
       reservationId: null, propertyId, roomId, lockId: map.lockId,
@@ -79,6 +91,7 @@ export async function generateManualCode(formData: FormData): Promise<void> {
     detail: buildDetail({ extra: { hours, keyboardPwdId: String(keyboardPwdId) } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
+  return { ok: true };
 }
 
 function assertSlot(slot: number): void {
@@ -97,19 +110,19 @@ function backupSlotWhere(slot: number): { backupSlot: number } | { OR: { backupS
 }
 
 /** Reveal a per-lock staff backup code in a given slot (logged, amber). */
-export async function revealBackupCode(propertyId: string, roomId: string, slot: number): Promise<{ pin: string }> {
+export async function revealBackupCode(propertyId: string, roomId: string, slot: number): Promise<ActionResult<{ pin: string }>> {
   assertSlot(slot);
   const user = await requirePermission("backup_code.reveal", propertyId);
   const code = await prisma.passcode.findFirst({
     where: { propertyId, roomId, type: "backup", status: "active", ...backupSlotWhere(slot) },
     orderBy: { createdAt: "desc" },
   });
-  if (!code) throw new Error(`No backup code in slot ${slot} — rotate to create one`);
+  if (!code) return { ok: false, error: `No backup code in slot ${slot} yet — rotate it to create one.` };
   await writeAudit(user, {
     action: "backup_code_revealed", propertyId, roomId, lockId: code.lockId,
     detail: buildDetail({ outcome: "warning", extra: { slot } }),
   });
-  return { pin: code.pin };
+  return { ok: true, data: { pin: code.pin } };
 }
 
 /**
@@ -117,13 +130,13 @@ export async function revealBackupCode(propertyId: string, roomId: string, slot:
  * delete the old one (new-first so a failure never leaves the slot empty), and log
  * the masked before→after. Each of the BACKUP_SLOTS slots rotates independently.
  */
-export async function rotateBackupCode(propertyId: string, roomId: string, slot: number): Promise<void> {
+export async function rotateBackupCode(propertyId: string, roomId: string, slot: number): Promise<ActionResult> {
   assertSlot(slot);
   const user = await requirePermission("backup_code.rotate", propertyId);
   const map = await prisma.lockMap.findUnique({
     where: { propertyId_roomId: { propertyId, roomId } },
   });
-  if (!map) throw new Error("Room is not mapped to a lock");
+  if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
 
   const old = await prisma.passcode.findFirst({
     where: { propertyId, roomId, type: "backup", status: "active", ...backupSlotWhere(slot) },
@@ -131,9 +144,14 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
   });
 
   const pin = generatePin();
-  const { keyboardPwdId } = await createPasscode({
-    lockId: map.lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
-  });
+  let keyboardPwdId: number;
+  try {
+    ({ keyboardPwdId } = await createPasscode({
+      lockId: map.lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
+    }));
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   await prisma.passcode.create({
     data: {
       reservationId: null, propertyId, roomId, lockId: map.lockId,
@@ -142,7 +160,11 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
     },
   });
   if (old) {
-    await deletePasscode({ lockId: old.lockId, keyboardPwdId: old.keyboardPwdId });
+    // Best-effort delete of the previous code; the new one is already live, so a
+    // failure here must not surface as an error (it would imply rotation failed).
+    try {
+      await deletePasscode({ lockId: old.lockId, keyboardPwdId: old.keyboardPwdId });
+    } catch { /* leave old row active-untracked; sync-from-lock will surface drift */ }
     await prisma.passcode.update({ where: { id: old.id }, data: { status: "revoked" } });
   }
   await writeAudit(user, {
@@ -150,25 +172,30 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
     detail: buildDetail({ beforePin: old?.pin, afterPin: pin, extra: { slot } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
+  return { ok: true };
 }
 
 /**
  * Reconcile our DB against the lock (spec §10). Lists the lock's real passcodes,
  * diffs against our active rows, logs a warning on drift (potential lockout).
  */
-export async function syncFromLock(
-  propertyId: string, roomId: string,
-): Promise<{ inSync: boolean; missingOnLock: string[]; orphanOnLock: string[] }> {
+export async function syncFromLock(propertyId: string, roomId: string): Promise<ActionResult> {
   const user = await requirePermission("lock.sync", propertyId);
   const map = await prisma.lockMap.findUnique({
     where: { propertyId_roomId: { propertyId, roomId } },
   });
-  if (!map) throw new Error("Room is not mapped to a lock");
+  if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
 
-  const [{ list }, active] = await Promise.all([
-    listPasscodes(map.lockId),
-    prisma.passcode.findMany({ where: { propertyId, roomId, status: "active" } }),
-  ]);
+  let list: Awaited<ReturnType<typeof listPasscodes>>["list"];
+  let active: Awaited<ReturnType<typeof prisma.passcode.findMany>>;
+  try {
+    [{ list }, active] = await Promise.all([
+      listPasscodes(map.lockId),
+      prisma.passcode.findMany({ where: { propertyId, roomId, status: "active" } }),
+    ]);
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
   const drift = detectDrift(
     active.map((p) => String(p.keyboardPwdId)),
     list.map((p) => String(p.keyboardPwdId)),
@@ -182,6 +209,5 @@ export async function syncFromLock(
     }),
   });
   revalidatePath(detailPath(propertyId, roomId));
-  return drift;
+  return { ok: true };
 }
-

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
 import { syncDiscoveredLocks, type SyncSummary } from "@/lib/lock-sync";
+import { syncGateways, type GatewaySyncSummary } from "@/lib/gateway-sync";
 import { canonicalLockName } from "@/lib/lock-naming";
 import { renameLock } from "@/lib/ttlock";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
@@ -14,25 +15,39 @@ import { writeAudit } from "@/lib/audit-write";
 export interface SyncState {
   ran: boolean;
   summary?: SyncSummary;
+  gateways?: GatewaySyncSummary;
   error?: string;
 }
 
-/** Run the TTLock discovery sync (auto-map conforming names, queue the rest). */
+/**
+ * Run the TTLock discovery sync (auto-map conforming names, queue the rest), then
+ * the gateway sync (link locks→gateways + infer each gateway's property). Gateways
+ * run second so they see the freshly-written LockMap rows. A gateway-sync failure
+ * is non-fatal — the lock results still return.
+ */
 export async function runLockSync(_prev: SyncState, _formData: FormData): Promise<SyncState> {
   const user = await requirePermission("lock.discover");
   try {
     const summary = await syncDiscoveredLocks();
+
+    let gateways: GatewaySyncSummary | undefined;
+    try {
+      gateways = await syncGateways();
+    } catch (ge: any) {
+      gateways = { total: 0, updated: 0, removed: 0, lockLinks: 0, errors: [{ gatewayId: "all", error: ge?.message ?? String(ge) }] };
+    }
+
     await writeAudit(user, {
       action: "lock_discovery_sync",
       propertyId: "all",
       detail: buildDetail({
-        outcome: summary.errors.length ? "warning" : "success",
-        message: `mapped ${summary.mapped}, queued ${summary.queued}, kept ${summary.kept}, unresolved ${summary.unresolved} of ${summary.total}`,
-        extra: { errors: summary.errors },
+        outcome: summary.errors.length || gateways.errors.length ? "warning" : "success",
+        message: `mapped ${summary.mapped}, queued ${summary.queued}, kept ${summary.kept}, unresolved ${summary.unresolved} of ${summary.total} · gateways ${gateways.updated} (${gateways.lockLinks} links)`,
+        extra: { errors: summary.errors, gatewayErrors: gateways.errors },
       }),
     });
     revalidatePath("/unassigned");
-    return { ran: true, summary };
+    return { ran: true, summary, gateways };
   } catch (e: any) {
     return { ran: true, error: e?.message ?? String(e) };
   }

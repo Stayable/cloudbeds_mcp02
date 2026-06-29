@@ -66,6 +66,24 @@ NEW BACKLOG (2026-06-28 PM, from BK):
       in notifications.ts = alert AND not a reveal; TopBar bell filter uses it. Reveals still appear in the
       Activity log (amber) — only the bell is filtered. (TDD.)
 NOT YET DEPLOYED — committed? no. Push to deploy (lock-app + middleware are Git-connected → auto-deploy).
+
+GATEWAY STATUS + GRACEFUL ERRORS (DONE 2026-06-29, spec
+docs/superpowers/specs/2026-06-29-lock-app-gateway-status-and-graceful-errors-design.md):
+- PART B (graceful errors): server actions now return `ActionResult` instead of throwing
+  (action-result.ts + mapActionError, -2012→friendly gateway text, TDD). Client `<ActionButton>`
+  (pending-disabled → kills the lock-238 rotate double-submit race) + `<ActionForm>` + centered
+  dismissible `<ActionError>` modal; RevealButton + RoomAssignForm on same contract; `(app)/error.tsx`
+  boundary. Fixes the 239 gateway-offline CRASH ("server-side exception / Digest"), the 238 race, and
+  the stuck-on-back behavior. Files: components/{ActionButton,ActionForm,ActionError}.tsx, lib/action-result.ts,
+  rooms/[roomId]/{actions.ts,page.tsx,RevealButton.tsx}, lock-actions.ts, devices/[lockId]/RoomAssignForm.tsx.
+- PART A (gateway status): new `Gateway` model + `UnassignedLock.gatewayId` (lock-app schema, pushed to
+  Neon). ttlock.ts gained `listGateways`+`listLocksForGateway` (both clients). `gateway-sync.ts` folded into
+  the existing discovery Sync action (runs AFTER lock sync; infers each gateway's property from served locks
+  via `inferGatewayProperty`, TDD; sets LockMap/UnassignedLock.gatewayId; stale-cleanup guarded vs empty
+  response). Devices page Gateways section; new `/devices/gateways/[gatewayId]` detail page (status + served
+  locks); lock-detail + room-detail cards show the connected gateway (name+status) linked. gateway-view.ts.
+- VERIFY LIVE (sandbox can't reach TTLock): run Sync → gateways populate; open Lakeland 239 → "not connected"
+  + generating a code shows the friendly modal, no crash; lock 238 → rapid rotate locks the button.
 - [ ] **User Logs** — a view of actions taken within the dashboards, per user (EventLog already stores
       actorUserId/actorEmail/actorRole). CLARIFY w/ BK: dedicated "User Logs" page vs a user filter on the existing
       Activity page.

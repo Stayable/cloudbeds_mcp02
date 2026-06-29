@@ -195,6 +195,21 @@ export async function listGateways(pageNo = 1, pageSize = 100): Promise<{ total:
   return { total: body.total ?? 0, list: body.list ?? [] };
 }
 
+/** Locks bound to a gateway. Iterating gateways (few) beats per-lock lookups. */
+export async function listLocksForGateway(gatewayId: number | bigint, pageNo = 1, pageSize = 100): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/gateway/listLock", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    gatewayId: String(gatewayId),
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "gateway/listLock");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
 /** Gateways a specific lock can talk through (each carries its own isOnline). */
 export async function listGatewaysForLock(lockId: number | bigint): Promise<any[]> {
   const { accessToken } = await getTTLockToken();

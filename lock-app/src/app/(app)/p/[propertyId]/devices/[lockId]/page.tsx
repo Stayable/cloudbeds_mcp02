@@ -4,6 +4,7 @@ import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { unassignedLockName } from "@/lib/lock-naming";
 import Forbidden from "@/components/Forbidden";
+import ActionButton from "@/components/ActionButton";
 import { unmapRoom } from "@/app/(app)/lock-actions";
 import RoomAssignForm from "./RoomAssignForm";
 
@@ -28,6 +29,9 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
   // property's available pool (its name is "<ABBR> (unassigned)").
   const inPool = !!pooled && pooled.name === poolName;
   if (!mapped && !inPool) return <Forbidden what="this lock for this property" />;
+
+  const gatewayId = mapped?.gatewayId ?? pooled?.gatewayId ?? null;
+  const gateway = gatewayId ? await prisma.gateway.findUnique({ where: { gatewayId } }) : null;
 
   const name = mapped?.alias?.trim() || pooled?.name?.trim() || `${property.abbr} ${lockIdStr}`;
   const online = mapped?.online ?? pooled?.online ?? false;
@@ -64,7 +68,13 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 13, alignItems: "baseline", marginTop: 16 }}>
               <span className="lbl">Lock ID</span><span className="mono">{lockIdStr}</span>
               <span className="lbl">Model</span><span className="mono">{mapped?.model ?? "—"}</span>
-              <span className="lbl">Gateway</span><span className="mono">{mapped?.gatewayId ? String(mapped.gatewayId) : "—"}</span>
+              <span className="lbl">Gateway</span>
+              {gateway ? (
+                <Link href={`/p/${propertyId}/devices/gateways/${gateway.gatewayId}`} className="mono" style={{ color: "var(--blue)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: gateway.online ? "var(--ok)" : "var(--crit)" }} />
+                  {gateway.name} · {gateway.online ? "online" : "offline"}
+                </Link>
+              ) : <span className="mono" style={{ color: "var(--warn-ink)" }}>not connected</span>}
             </div>
           </div>
         </div>
@@ -79,9 +89,12 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
                     <span className="lbl">Room</span>
                     <Link href={`/p/${propertyId}/rooms/${mapped.roomId}`} className="mono" style={{ color: "var(--blue)" }}>{mapped.roomName?.trim() || mapped.roomId}</Link>
                   </div>
-                  <form action={async () => { "use server"; await unmapRoom(propertyId, mapped.roomId); }}>
-                    <button className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}>Remove from room</button>
-                  </form>
+                  <ActionButton
+                    label="Remove from room" pendingLabel="Removing…"
+                    className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}
+                    confirm="Remove this lock from the room? It returns to the available pool."
+                    action={async () => { "use server"; return unmapRoom(propertyId, mapped.roomId); }}
+                  />
                   <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>Renames the lock to “{poolName ?? "(unassigned)"}” and returns it to the available pool.</p>
                 </>
               ) : (

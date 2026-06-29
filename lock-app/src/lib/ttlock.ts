@@ -195,6 +195,35 @@ export async function deletePasscode(args: DeletePasscodeArgs): Promise<void> {
   assertOk(body, "keyboardPwd/delete");
 }
 
+/** Gateways the account owns. isOnline + lockNum tell us bridge health/coverage. */
+export async function listGateways(pageNo = 1, pageSize = 100): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/gateway/list", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "gateway/list");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
+/** Locks bound to a gateway. We iterate gateways (few) not locks (~1,450). */
+export async function listLocksForGateway(gatewayId: number | bigint, pageNo = 1, pageSize = 100): Promise<{ total: number; list: any[] }> {
+  const { accessToken } = await getTTLockToken();
+  const body = await postForm("/v3/gateway/listLock", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    gatewayId: String(gatewayId),
+    pageNo,
+    pageSize,
+    date: Date.now(),
+  });
+  assertOk(body, "gateway/listLock");
+  return { total: body.total ?? 0, list: body.list ?? [] };
+}
+
 export interface LockPasscode {
   keyboardPwdId: number;
   keyboardPwd: string;

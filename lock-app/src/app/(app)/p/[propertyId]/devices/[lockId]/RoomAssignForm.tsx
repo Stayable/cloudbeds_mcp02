@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { assignLockToRoom } from "@/app/(app)/lock-actions";
+import ActionError from "@/components/ActionError";
 
 interface RoomOption {
   roomId: string;
@@ -19,6 +21,19 @@ export default function RoomAssignForm({ lockId, propertyId }: { lockId: string;
   const [roomId, setRoomId] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "no-key" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    start(async () => {
+      const res = await assignLockToRoom(formData);
+      if (res.ok) router.refresh();
+      else setActionError(res.error);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +51,7 @@ export default function RoomAssignForm({ lockId, propertyId }: { lockId: string;
   }, [propertyId]);
 
   return (
-    <form action={assignLockToRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <form onSubmit={onSubmit} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
       <input type="hidden" name="lockId" value={lockId} />
       <input type="hidden" name="propertyId" value={propertyId} />
       <div style={{ flex: 1, minWidth: 160 }}>
@@ -58,7 +73,8 @@ export default function RoomAssignForm({ lockId, propertyId }: { lockId: string;
           ))}
         </select>
       </div>
-      <button type="submit" className="btn btn-primary" style={{ height: 44 }} disabled={!roomId}>Assign</button>
+      <button type="submit" className="btn btn-primary" style={{ height: 44 }} disabled={!roomId || pending}>{pending ? "Assigning…" : "Assign"}</button>
+      {actionError && <ActionError message={actionError} onClose={() => setActionError(null)} />}
       {status === "no-key" && (
         <span className="mono" style={{ flexBasis: "100%", fontSize: 11, color: "#9A5E00" }}>No Cloudbeds key for this property — add CLOUDBEDS_API_KEY_{propertyId}.</span>
       )}

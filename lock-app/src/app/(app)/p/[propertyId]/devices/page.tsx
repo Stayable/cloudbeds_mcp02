@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
+import Link from "next/link";
 import { unassignedLockName } from "@/lib/lock-naming";
+import { toGatewayRow } from "@/lib/gateway-view";
 import Forbidden from "@/components/Forbidden";
 import DevicesTable, { type DeviceRow } from "./DevicesTable";
 
@@ -15,10 +17,12 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
   if (!property) return <Forbidden what="this property" />;
 
   const poolName = unassignedLockName(propertyId);
-  const [mapped, available] = await Promise.all([
+  const [mapped, available, gateways] = await Promise.all([
     prisma.lockMap.findMany({ where: { propertyId }, orderBy: { roomId: "asc" } }),
     poolName ? prisma.unassignedLock.findMany({ where: { name: poolName }, orderBy: { lockId: "asc" } }) : Promise.resolve([]),
+    prisma.gateway.findMany({ where: { propertyId }, orderBy: { name: "asc" } }),
   ]);
+  const gatewayRows = gateways.map(toGatewayRow);
 
   // "TTLock name" = the name captured from the TTLock app at the last discovery
   // sync (alias for mapped, name for pooled). Run discovery sync to refresh it —
@@ -69,6 +73,31 @@ export default async function DevicesPage({ params }: { params: { propertyId: st
           {offline > 0 && <span className="pill pill-crit"><span className="dot" />{offline} offline</span>}
         </div>
       </div>
+
+      {gatewayRows.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span className="card-title">Gateways</span>
+            <span className="subtle" style={{ fontSize: 12 }}>{gatewayRows.length} · {gatewayRows.filter((g) => g.online).length} online</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {gatewayRows.map((g, i) => (
+              <Link
+                key={g.gatewayId}
+                href={`/p/${propertyId}/devices/gateways/${g.gatewayId}`}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: i > 0 ? "1px solid var(--divider)" : undefined, color: "var(--ink)" }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: g.online ? "var(--ok)" : "var(--crit)", flex: "0 0 auto" }} />
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{g.name}</span>
+                <span className="subtle" style={{ fontSize: 12 }}>{g.online ? "online" : "offline"}{g.lockCount != null ? ` · ${g.lockCount} locks` : ""}</span>
+                <div style={{ flex: 1 }} />
+                {g.lastSeen && <span className="subtle mono" style={{ fontSize: 11 }}>{g.lastSeen}</span>}
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" strokeWidth={1.8} strokeLinecap="round"><path d="M6 3l5 5-5 5" /></svg>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="empty">No locks for this property yet.</div>

@@ -8,6 +8,8 @@ import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import Forbidden from "@/components/Forbidden";
+import ActionButton from "@/components/ActionButton";
+import ActionForm from "@/components/ActionForm";
 import RevealButton from "./RevealButton";
 import {
   revealGuestCode, revokeGuestCode, generateManualCode,
@@ -56,6 +58,7 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
   ]);
   const roomNumber = resolvedNumber || roomId;
   const label = map?.alias?.trim() || roomNumber;
+  const gateway = map?.gatewayId ? await prisma.gateway.findUnique({ where: { gatewayId: map.gatewayId } }) : null;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -97,14 +100,19 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   {can("guest_code.revoke") && (
-                    <form action={async () => { "use server"; await revokeGuestCode(propertyId, roomId); }} style={{ flex: 1 }}>
-                      <button className="btn btn-danger" style={{ width: "100%" }}>Revoke code</button>
-                    </form>
+                    <ActionButton
+                      label="Revoke code" pendingLabel="Revoking…"
+                      className="btn btn-danger" style={{ flex: 1 }}
+                      confirm="Revoke this guest's door code? They won't be able to get in until a new code is issued."
+                      action={async () => { "use server"; return revokeGuestCode(propertyId, roomId); }}
+                    />
                   )}
                   {can("lock.sync") && map && (
-                    <form action={async () => { "use server"; await syncFromLock(propertyId, roomId); }} style={{ flex: 1 }}>
-                      <button className="btn btn-ghost" style={{ width: "100%" }}>Sync from lock</button>
-                    </form>
+                    <ActionButton
+                      label="Sync from lock" pendingLabel="Syncing…"
+                      className="btn btn-ghost" style={{ flex: 1 }}
+                      action={async () => { "use server"; return syncFromLock(propertyId, roomId); }}
+                    />
                   )}
                 </div>
                 {guest.reservationId && <div className="subtle" style={{ marginTop: 10, fontSize: 12 }}>Reservation {guest.reservationId}</div>}
@@ -130,9 +138,12 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                         : "Not set"}
                     </div>
                     {can("backup_code.rotate") && map && (
-                      <form action={async () => { "use server"; await rotateBackupCode(propertyId, roomId, slot); }}>
-                        <button className="btn btn-navy">{b ? "Rotate" : "Create"}</button>
-                      </form>
+                      <ActionButton
+                        label={b ? "Rotate" : "Create"} pendingLabel="…"
+                        className="btn btn-navy"
+                        confirm={b ? `Rotate backup ${slot}? The current code stops working immediately.` : undefined}
+                        action={async () => { "use server"; return rotateBackupCode(propertyId, roomId, slot); }}
+                      />
                     )}
                   </div>
                 );
@@ -144,12 +155,12 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
           {can("guest_code.generate_manual") && map && (
             <div className="card">
               <div className="card-title" style={{ marginBottom: 14 }}>Generate a manual code</div>
-              <form action={generateManualCode} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <ActionForm action={generateManualCode} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <input type="hidden" name="propertyId" value={propertyId} />
                 <input type="hidden" name="roomId" value={roomId} />
                 <div><label className="lbl">VALID FOR (HOURS)</label><input name="hours" type="number" min={1} defaultValue={24} className="field" style={{ width: 100, height: 44 }} /></div>
                 <button className="btn btn-primary" style={{ height: 44, flex: 1 }}>Generate code</button>
-              </form>
+              </ActionForm>
             </div>
           )}
         </div>
@@ -190,6 +201,15 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                   <div className="batt-track"><div className="batt-bar" style={{ width: `${battery ?? 0}%`, background: battery != null && battery < 20 ? "var(--crit)" : "var(--ok)" }} /></div>
                   <span className="mono tnum" style={{ fontWeight: 600, width: 42, textAlign: "right", color: battColor }}>{battery == null ? "—" : `${battery}%`}</span>
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", fontSize: 13, alignItems: "baseline", marginTop: 16 }}>
+                  <span className="lbl">Gateway</span>
+                  {gateway ? (
+                    <Link href={`/p/${propertyId}/devices/gateways/${gateway.gatewayId}`} className="mono" style={{ color: "var(--blue)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: gateway.online ? "var(--ok)" : "var(--crit)" }} />
+                      {gateway.name} · {gateway.online ? "online" : "offline"}
+                    </Link>
+                  ) : <span className="mono" style={{ color: "var(--warn-ink)" }}>not connected</span>}
+                </div>
               </>
             ) : <p className="subtle">No lock mapped.</p>}
           </div>
@@ -203,13 +223,16 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                     <span className="lbl">Lock</span><span className="mono">{map.alias?.trim() || `Lock ${map.lockId}`}</span>
                     <span className="lbl">Lock ID</span><span className="mono">{String(map.lockId)}</span>
                   </div>
-                  <form action={async () => { "use server"; await unmapRoom(propertyId, roomId); }}>
-                    <button className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}>Remove lock from this room</button>
-                  </form>
+                  <ActionButton
+                    label="Remove lock from this room" pendingLabel="Removing…"
+                    className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}
+                    confirm="Remove this lock from the room? It returns to the available pool."
+                    action={async () => { "use server"; return unmapRoom(propertyId, roomId); }}
+                  />
                   <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>Removing renames the lock to “{poolName ?? "(unassigned)"}” and returns it to this property’s available pool.</p>
                 </>
               ) : availableLocks.length > 0 ? (
-                <form action={assignLockToRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <ActionForm action={assignLockToRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <input type="hidden" name="propertyId" value={propertyId} />
                   <input type="hidden" name="roomId" value={roomId} />
                   <div style={{ flex: 1, minWidth: 160 }}>
@@ -224,7 +247,7 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
                     </select>
                   </div>
                   <button className="btn btn-primary" style={{ height: 44 }}>Assign</button>
-                </form>
+                </ActionForm>
               ) : (
                 <p className="subtle">No available locks in {poolName ? `“${poolName.split(" ")[0]}”` : "this property"}’s pool. Unmap a lock from another room to free one, or assign a brand-new lock from the <span style={{ fontWeight: 600 }}>Unassigned</span> queue.</p>
               )}

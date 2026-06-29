@@ -1,0 +1,45 @@
+"use client";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { ActionResult } from "@/lib/action-result";
+import ActionError from "./ActionError";
+
+/**
+ * <form> wrapper for Server Actions that take FormData (inputs/selects). Same
+ * guarantees as ActionButton: submit disabled while pending (no double-submit),
+ * dismissible modal on { ok:false }, refresh on success. Render the inputs and a
+ * submit button as children; the submit button is disabled via the `fieldset`
+ * while pending. Pass `submitLabel`-less children when you want full control.
+ */
+export default function ActionForm({
+  action,
+  children,
+  style,
+}: {
+  action: (formData: FormData) => Promise<ActionResult>;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    start(async () => {
+      const res = await action(formData);
+      if (res.ok) router.refresh();
+      else setError(res.error);
+    });
+  }
+
+  return (
+    <form onSubmit={onSubmit} style={style}>
+      <fieldset disabled={pending} style={{ border: "none", padding: 0, margin: 0, display: "contents" }}>
+        {children}
+      </fieldset>
+      {error && <ActionError message={error} onClose={() => setError(null)} />}
+    </form>
+  );
+}
