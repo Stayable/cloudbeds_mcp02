@@ -19,8 +19,20 @@ import { assignLockToRoom, unmapRoom } from "@/app/(app)/lock-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function DoorDetailPage({ params }: { params: { propertyId: string; roomId: string } }) {
+export default async function DoorDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { propertyId: string; roomId: string };
+  searchParams?: { from?: string };
+}) {
   const { propertyId, roomId } = params;
+  // Back-link target: returning to where you came from. From the Dashboard's
+  // heatmap / "Needs attention", go back to the Dashboard; otherwise the Rooms list.
+  const back =
+    searchParams?.from === "dashboard"
+      ? { href: `/p/${propertyId}/dashboard`, label: "Dashboard" }
+      : { href: `/p/${propertyId}/rooms`, label: "All rooms" };
   const user = await requireUserOrRedirect();
   if (!sessionCan(user, "rooms.view", propertyId)) return <Forbidden what="this room" />;
   const property = getProperty(propertyId);
@@ -65,8 +77,8 @@ export default async function DoorDetailPage({ params }: { params: { propertyId:
 
   return (
     <div>
-      <Link href={`/p/${propertyId}/rooms`} className="backlink">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M10 13L5 8l5-5" /></svg>All rooms
+      <Link href={back.href} className="backlink">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"><path d="M10 13L5 8l5-5" /></svg>{back.label}
       </Link>
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 18 }}>

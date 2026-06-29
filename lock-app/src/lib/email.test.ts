@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { buildOtpEmail } from "./email";
+import { buildOtpEmail, senderFrom } from "./email";
+
+describe("senderFrom", () => {
+  it("wraps a bare address with the Stayable Locks display name", () => {
+    expect(senderFrom("admin@rentstayable.com")).toBe("Stayable Locks <admin@rentstayable.com>");
+  });
+  it("leaves a full 'Name <addr>' value untouched", () => {
+    expect(senderFrom("Front Desk <admin@rentstayable.com>")).toBe("Front Desk <admin@rentstayable.com>");
+  });
+  it("trims whitespace and falls back when unset", () => {
+    expect(senderFrom("  admin@rentstayable.com  ")).toBe("Stayable Locks <admin@rentstayable.com>");
+    expect(senderFrom(undefined)).toBe("Stayable Locks <admin@rentstayable.com>");
+    expect(senderFrom("")).toBe("Stayable Locks <admin@rentstayable.com>");
+  });
+});
 
 describe("buildOtpEmail", () => {
   const code = "048213";

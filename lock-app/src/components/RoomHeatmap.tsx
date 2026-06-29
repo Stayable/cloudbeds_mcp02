@@ -16,18 +16,21 @@ function chipTitle(ch: RoomChip): string {
  *                 room's detail page (per-property Dashboard).
  */
 export default function RoomHeatmap({
-  chips, variant, propertyId,
+  chips, variant, propertyId, from,
 }: {
   chips: RoomChip[];
   variant: "square" | "numbered";
   propertyId?: string;
+  /** Marks where the link came from so the room page's back-link returns here. */
+  from?: string;
 }) {
   if (chips.length === 0) return null;
+  const suffix = from ? `?from=${from}` : "";
   return (
     <div className="roomwell">
       {chips.map((ch) =>
         variant === "numbered" && propertyId ? (
-          <Link key={ch.roomId} href={`/p/${propertyId}/rooms/${ch.roomId}`} className={chipClass(ch, "roomchip")} title={chipTitle(ch)}>
+          <Link key={ch.roomId} href={`/p/${propertyId}/rooms/${ch.roomId}${suffix}`} className={chipClass(ch, "roomchip")} title={chipTitle(ch)}>
             {ch.label}
           </Link>
         ) : (

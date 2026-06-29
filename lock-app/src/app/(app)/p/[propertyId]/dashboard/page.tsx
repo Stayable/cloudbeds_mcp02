@@ -99,7 +99,7 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
           <p className="subtle">No rooms found — check the Cloudbeds key for this property.</p>
         ) : (
           <>
-            <RoomHeatmap chips={roomChips} variant="numbered" propertyId={propertyId} />
+            <RoomHeatmap chips={roomChips} variant="numbered" propertyId={propertyId} from="dashboard" />
             <div style={{ marginTop: 12 }}><RoomHeatmapLegend /></div>
           </>
         )}
@@ -116,7 +116,7 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
             <p className="subtle" style={{ color: "var(--ok-ink)" }}>All clear — nothing needs attention.</p>
           ) : (
             actions.map((a, i) => (
-              <Link key={`${a.kind}-${a.roomId}-${i}`} href={`/p/${propertyId}/rooms/${a.roomId}`}
+              <Link key={`${a.kind}-${a.roomId}-${i}`} href={`/p/${propertyId}/rooms/${a.roomId}?from=dashboard`}
                 style={{ display: "flex", gap: 12, alignItems: "center", padding: "11px 0", borderTop: i ? "1px solid var(--divider)" : "none" }}>
                 <span style={{ width: 9, height: 9, borderRadius: 9, flex: "0 0 auto", background: a.severity === "critical" ? "var(--crit)" : "var(--warn)" }} />
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{a.label}</span>

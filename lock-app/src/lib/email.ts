@@ -7,6 +7,20 @@
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const NAVY = "#041E42"; // Stayable brand navy, matches the app headers
+const SENDER_NAME = "Stayable Locks";
+const DEFAULT_SENDER_ADDRESS = "admin@rentstayable.com"; // DNS-verified in Resend
+
+/**
+ * Compose the From header. Resend shows the friendly name only when the value is
+ * `Name <addr>` — a bare address renders as just the address. So accept either: a
+ * full `Name <addr>` (used as-is) or a bare address (wrapped with the Stayable
+ * Locks name). Falls back to the verified default so it's always a real sender.
+ */
+export function senderFrom(configured?: string): string {
+  const v = configured?.trim();
+  if (!v) return `${SENDER_NAME} <${DEFAULT_SENDER_ADDRESS}>`;
+  return v.includes("<") ? v : `${SENDER_NAME} <${v}>`;
+}
 
 export function buildOtpEmail(code: string): { subject: string; html: string; text: string } {
   const subject = `Your Stayable Locks sign-in code: ${code}`;
@@ -43,10 +57,9 @@ export function buildOtpEmail(code: string): { subject: string; html: string; te
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY not configured");
-  // Authoritative value is the EMAIL_FROM env var; this fallback is the verified
-  // Stayable sender so a missing env var still sends from a real (DNS-verified)
-  // address rather than Resend's sandbox domain.
-  const from = process.env.EMAIL_FROM || "Stayable Locks <admin@rentstayable.com>";
+  // EMAIL_FROM may be a bare address or a full "Name <addr>" — senderFrom always
+  // yields a friendly-named sender on the verified domain.
+  const from = senderFrom(process.env.EMAIL_FROM);
 
   const { subject, html, text } = buildOtpEmail(code);
   const res = await fetch(RESEND_ENDPOINT, {
