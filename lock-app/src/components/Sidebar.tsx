@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 /** Persistent navy sidebar: FLEET nav always, PROPERTY nav when inside a property. */
 export default function Sidebar({
-  name, role, canDiscover, canRooms, canDevices, canActivity, unassignedCount,
+  name, role, canDiscover, canRooms, canDevices, canActivity, canSettings, unassignedCount,
 }: {
   name: string;
   role: string;
@@ -12,6 +12,7 @@ export default function Sidebar({
   canRooms: boolean;
   canDevices: boolean;
   canActivity: boolean;
+  canSettings: boolean;
   unassignedCount: number;
 }) {
   const path = usePathname() ?? "";
@@ -33,6 +34,11 @@ export default function Sidebar({
           <Link href="/unassigned" className={`navitem${is("/unassigned") ? " active" : ""}`}>
             <Icon.lock /><span>Unassigned</span>
             {unassignedCount > 0 && <span className="nav-badge gold">{unassignedCount}</span>}
+          </Link>
+        )}
+        {canSettings && (
+          <Link href="/settings" className={`navitem${is("/settings") ? " active" : ""}`}>
+            <Icon.gear /><span>Settings</span>
           </Link>
         )}
 
@@ -83,4 +89,5 @@ const Icon = {
   building: () => <svg {...sw}><path d="M3 15V4l8-2v13M3 15h12M11 15V6l4 1.5V15" strokeLinejoin="round" /></svg>,
   device: () => <svg {...sw}><rect x="4" y="2.5" width="10" height="13" rx="2" /><path d="M7 6h4M7 9h4M7 12h2" strokeLinecap="round" /></svg>,
   pulse: () => <svg {...sw} strokeLinecap="round"><path d="M2 9h3l1.5-4 3 9 1.5-5H16" /></svg>,
+  gear: () => <svg {...sw}><circle cx="9" cy="9" r="2.4" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4" strokeLinecap="round" /></svg>,
 };

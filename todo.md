@@ -106,7 +106,17 @@ ROOM-CHANGE AUTO PLAN (2026-06-30):
       self-heals on revoke) but more likely at */5. TDD, deployable on Hobby now.
 
 NEW BACKLOG (2026-06-30, from BK — captured, NOT yet built):
-- [ ] ⭐ GRACE PERIOD / revoke-delay (admin-configurable, new Settings → "Access timing" section, saved to DB).
+- [~] ⭐ GRACE PERIOD / revoke-delay. SETTINGS SHIPPED 2026-06-30 (Settings → Access timing: checkout grace
+      max 60m + transfer grace max 240m, AppSettings singleton model pushed to Neon, settings.manage-gated page
+      + sidebar link). Default 0 = revoke immediately (no behavior change yet). SAFETY RULE DROPPED per BK
+      (meeting will decide best timing). REMAINING: wire the middleware revoke paths (checkout/transfer) to read
+      AppSettings + shorten the PIN expiry via changePasscodePeriod (now+grace) instead of deleting — AFTER the
+      team sets timing. (Add AppSettings to middleware schema when wiring.)
+- [x] TEST re-sync button SHIPPED 2026-06-30 (per-property DASHBOARD, lock.sync-gated, labeled TEST): calls the
+      middleware /api/cron/reconcile?propertyId= on demand so a room change is picked up now without waiting for
+      the (daily-on-Hobby) cron. room-sync-actions.ts + RoomChangeSyncButton.tsx. Becomes redundant once the */5
+      cron is live on Pro. Uses MIDDLEWARE_URL env (default prod) + CRON_SECRET bearer when set.
+- [ ] ⭐ GRACE PERIOD behavior wiring — see above (the [~] item). [original capture:]
       On checkout/room-transfer, DON'T hard-delete the guest PIN — shorten its expiry to now+N min via
       changePasscodePeriod (already built); TTLock auto-expires it, the /5 cron finalizes DB cleanup. Two cases:
       #1 checkout headroom (guest still grabbing things → no attendant call), #2 room-transfer headroom.

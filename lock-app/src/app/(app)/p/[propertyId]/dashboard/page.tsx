@@ -7,6 +7,7 @@ import { buildRoomChips, type RoomChipInput } from "@/lib/rooms";
 import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
 import OccupancySyncButton from "@/components/OccupancySyncButton";
+import RoomChangeSyncButton from "@/components/RoomChangeSyncButton";
 import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
           <span className="card-title">All rooms{roomChips.length ? ` · ${roomChips.length}` : ""}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
             {sessionCan(user, "lock.sync", propertyId) && <OccupancySyncButton propertyId={propertyId} />}
+            {sessionCan(user, "lock.sync", propertyId) && <RoomChangeSyncButton propertyId={propertyId} />}
             <Link href={`/p/${propertyId}/rooms`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>List view</Link>
           </div>
         </div>

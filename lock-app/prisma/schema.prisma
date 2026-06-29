@@ -164,6 +164,18 @@ model RoomState {
   @@unique([propertyId, roomId])
 }
 
+// System-wide settings (single row, id="singleton"). Admin-editable in
+// Settings → Access timing. Grace minutes give a guest headroom before their PIN
+// is pulled on checkout / room transfer (0 = revoke immediately = today's
+// behavior). Stored now so ops can tune it; the revoke paths read it once the
+// team finalizes the timing (tracked in todo).
+model AppSettings {
+  id                   String   @id @default("singleton")
+  checkoutGraceMinutes Int      @default(0)
+  transferGraceMinutes Int      @default(0)
+  updatedAt            DateTime @updatedAt
+}
+
 model TtlockToken {
   id           String   @id @default(cuid())
   accessToken  String
