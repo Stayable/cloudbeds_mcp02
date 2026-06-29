@@ -662,6 +662,22 @@ export async function reconcileCheckedInReservations(
     }
     byRes.set(rid, { detail: full, desired: new Set(rooms) });
   }
+
+  // A just-moved reservation can be MISSING from the checked-in LIST entirely (the
+  // list lags the move). For any reservation we hold a code for that the list did
+  // NOT return, fetch it directly — getReservation is fresh. If it's still in-house,
+  // fold in its true current rooms so the move is handled; if it's no longer
+  // in-house, leave it to the checkout webhook (no false revoke). This makes move
+  // detection independent of the list, which is where the lag bites.
+  for (const rid of coded) {
+    if (byRes.has(rid)) continue;
+    try {
+      const d = await getReservation(registry, propertyId, rid);
+      if (isCheckedIn(d)) byRes.set(rid, { detail: d, desired: new Set(extractRoomIds(d)) });
+    } catch {
+      /* skip — conservative */
+    }
+  }
   result.roomsConsidered = [...byRes.values()].reduce((n, r) => n + r.desired.size, 0);
 
   // 1. Revoke stale — only for reservations we KNOW are still checked in but whose
