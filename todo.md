@@ -88,15 +88,41 @@ docs/superpowers/specs/2026-06-29-lock-app-gateway-status-and-graceful-errors-de
 ROOM-CHANGE AUTO PLAN (2026-06-30):
 - Webhook does NOT fire on a pure room change for these accounts → caught only by the poll-reconcile cron
   (/api/cron/reconcile → reconcileCheckedInReservations). Cron is DAILY on Hobby; needs Vercel PRO ($20/mo,
-  BK requesting from Rob) to run sub-daily. Fastest Vercel cron = */1 (every minute); recommend */2.
+  BK requesting from Rob) to run sub-daily. Fastest Vercel cron = */1 (every minute). **BK DECISION: */5 min**
+  (safe even at full deploy — reconcile is ~2-3 Cloudbeds calls/property/run, rooms inline, steady-state
+  zero TTLock/CB-write calls; 8 properties = 8 independent 5-req/sec budgets; DB upserts scale w/ occupancy
+  but trivial for Neon). Manual-button idea DROPPED (a room change at 2am with nobody watching needs auto).
 - LEVER 1 DONE (2026-06-30): cron now skips properties with no mapped locks (pure propertiesToReconcile,
   TDD) → today only Lakeland is polled (1 Cloudbeds call/run vs 8). Added ?propertyId= filter for single-prop
   tests. Files: middleware/lib/reservation-intent.ts + app/api/cron/reconcile/route.ts. Steady-state cost =
   ~1 getReservations/property/run (rooms inline; no PIN change → DB-only after).
-- ON PRO (do in order): (1) set CRON_SECRET on lock-middleware; (2) bump vercel.json cron to `*/2 * * * *`
+- ON PRO (do in order): (1) set CRON_SECRET on lock-middleware; (2) bump vercel.json cron to `*/5 * * * *`
   (NOT before Pro — Hobby rejects sub-daily crons and freezes the deploy); (3) run
   register-accommodation-webhooks.ts --apply + verify the event actually delivers — if it does, relax the cron
   to ~30 min (event-driven primary + cron backstop, near-zero API load).
+- [ ] DUPLICATE-PIN GUARD (do before sub-daily cron goes live): partial unique index on Passcode (one ACTIVE
+      guest PIN per (reservationId, roomId)) so a cron+webhook race can't double-create. Catch P2002 in
+      createPasscodeForRoom → delete the orphan TTLock code + return. Low-harm today (both codes work,
+      self-heals on revoke) but more likely at */5. TDD, deployable on Hobby now.
+
+NEW BACKLOG (2026-06-30, from BK — captured, NOT yet built):
+- [ ] ⭐ GRACE PERIOD / revoke-delay (admin-configurable, new Settings → "Access timing" section, saved to DB).
+      On checkout/room-transfer, DON'T hard-delete the guest PIN — shorten its expiry to now+N min via
+      changePasscodePeriod (already built); TTLock auto-expires it, the /5 cron finalizes DB cleanup. Two cases:
+      #1 checkout headroom (guest still grabbing things → no attendant call), #2 room-transfer headroom.
+      DESIGN Qs (brainstorm before building): separate delays for checkout vs transfer? per-property or global?
+      default value? CAVEAT: checkout grace = departing guest's code still works during turnover → cap SHORT
+      (15-30 min, hard max ~60) and SKIP the grace if the room gets a new check-in (double-access risk);
+      transfer grace has no such risk (can be more generous). Files: lock-app Settings UI + setting model +
+      middleware checkout/transfer revoke paths (revokePasscodes / reconcile).
+- [ ] RESEND email templates (BK creating): (a) "door code ready" for NEW guests, (b) "new door code" on
+      ROOM CHANGE. Wire sending into the middleware create path (postReservationNote already fires; add email
+      send via lib/email.ts Resend). Design brief exists: claude-design-guest-code-notification.md. Needs guest
+      email (we already fetch it via getGuest for the guest-details card). Gate so it only sends once per code.
+- [ ] SMS integration for automated guest messages (door codes + info). RECOMMENDATION: Twilio (primary —
+      reliability + best Node/Vercel SDK); Telnyx/Plivo cheaper alternatives. ⚠️ US business SMS requires A2P
+      10DLC brand+campaign registration (few-days lead time + small fee) — START EARLY, it's the long pole.
+      Resend is email-only so SMS is a separate provider. Mirror the email template set (code-ready, room-change).
 - [ ] **User Logs** — a view of actions taken within the dashboards, per user (EventLog already stores
       actorUserId/actorEmail/actorRole). CLARIFY w/ BK: dedicated "User Logs" page vs a user filter on the existing
       Activity page.
