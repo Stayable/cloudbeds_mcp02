@@ -11,6 +11,7 @@ import { detectDrift } from "@/lib/reconcile";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
 import { mapActionError, type ActionResult } from "@/lib/action-result";
+import { notifyGuestCode } from "@/lib/guest-notify";
 
 function detailPath(propertyId: string, roomId: string): string {
   return `/p/${propertyId}/rooms/${roomId}`;
@@ -126,9 +127,13 @@ export async function resendGuestCode(propertyId: string, roomId: string): Promi
   const label = map.alias?.trim() || map.roomName?.trim() || roomId;
   await postReservationNote(registry, propertyId, reservationId, `${label}-${pin}`).catch(() => {});
 
+  // Email the guest their refreshed code (best-effort — never blocks the resend).
+  const roomNumber = map.roomName?.trim() || roomId;
+  const notified = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "updated", doorCode: pin });
+
   await writeAudit(user, {
     action: "guest_code_resent", propertyId, roomId, lockId: map.lockId,
-    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId) } }),
+    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId), emailSent: notified.sent, emailReason: notified.reason } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true, data: { pin } };
