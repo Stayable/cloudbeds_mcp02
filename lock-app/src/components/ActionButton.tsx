@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/lib/action-result";
 import ActionError from "./ActionError";
+import LoadingOverlay from "./LoadingOverlay";
 
 /**
  * Button that runs a no-arg Server Action returning an ActionResult. Disabled
@@ -18,6 +19,7 @@ export default function ActionButton({
   pendingLabel,
   confirm,
   style,
+  loadingLabel,
 }: {
   action: () => Promise<ActionResult>;
   label: string;
@@ -25,6 +27,8 @@ export default function ActionButton({
   pendingLabel?: string;
   confirm?: string;
   style?: React.CSSProperties;
+  /** When set, show a full-screen overlay with this label while the action runs. */
+  loadingLabel?: string;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +48,7 @@ export default function ActionButton({
       <button type="button" className={className} disabled={pending} style={style} onClick={run}>
         {pending ? pendingLabel ?? "Working…" : label}
       </button>
+      {pending && loadingLabel && <LoadingOverlay label={loadingLabel} />}
       {error && <ActionError message={error} onClose={() => setError(null)} />}
     </>
   );

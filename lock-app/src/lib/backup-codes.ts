@@ -17,8 +17,10 @@ import { BACKUP_SLOTS } from "./door-detail";
 // row (rename → delete old codes → create N new), so doing them back-to-back makes
 // the later calls fail. Space every TTLock write out, and back off before a single
 // retry. Slower, but the assign shows a loading overlay so it's clearly working.
-const TTLOCK_WRITE_SPACING_MS = 700;
-const BACKUP_RETRY_BACKOFF_MS = 1500;
+// Gateway-relayed writes are slow and TTLock rate-limits bursts, so space them
+// generously — reliability over speed (the UI shows a loading overlay throughout).
+const TTLOCK_WRITE_SPACING_MS = 1300;
+const BACKUP_RETRY_BACKOFF_MS = 2000;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
@@ -45,7 +47,8 @@ export async function revokeAllCodesForLock(lockId: bigint): Promise<{ revoked: 
   const codes = await prisma.passcode.findMany({ where: { lockId, status: "active" } });
   let failed = 0;
   for (let i = 0; i < codes.length; i++) {
-    if (i > 0) await sleep(TTLOCK_WRITE_SPACING_MS); // space the deletes so they don't rate-limit each other / the creates that follow
+    // Space EVERY delete (incl. the first — gives a preceding rename room to settle).
+    if (codes.length) await sleep(TTLOCK_WRITE_SPACING_MS);
     try {
       await deletePasscode({ lockId: codes[i].lockId, keyboardPwdId: codes[i].keyboardPwdId });
     } catch {

@@ -106,6 +106,7 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
                   </div>
                   <ActionButton
                     label="Remove from room" pendingLabel="Removing…"
+                    loadingLabel="Removing lock — revoking its codes & renaming on the lock. This can take a moment. Please wait."
                     className="btn btn-ghost" style={{ color: "var(--crit-ink)", borderColor: "var(--line-2)" }}
                     confirm="Remove this lock from the room? It returns to the available pool."
                     action={async () => { "use server"; return unmapRoom(propertyId, mapped.roomId); }}
