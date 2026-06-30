@@ -43,16 +43,21 @@ export default function RoomHeatmap({
   );
 }
 
-/** Compact color legend, shared by Portfolio and the Dashboard rooms section. */
+/** Compact color legend, shared by Portfolio and the Dashboard rooms section.
+ *  Grouped so "has a lock" vs "no lock installed" reads at a glance. */
 export function RoomHeatmapLegend() {
   return (
     <div className="legend">
+      <span className="legend-group">LOCK INSTALLED</span>
       <span className="legend-item"><span className="legend-swatch rc-ok" />Occupied · ok</span>
       <span className="legend-item"><span className="legend-swatch rc-warning" />Occupied · low battery</span>
       <span className="legend-item"><span className="legend-swatch rc-issue" />Occupied · offline</span>
       <span className="legend-item"><span className="legend-swatch rc-vacant" />Vacant</span>
-      <span className="legend-item"><span className="legend-swatch rc-occupied-no-lock" />Occupied · no lock installed</span>
-      <span className="legend-item"><span className="legend-swatch rc-no-lock" />No lock (vacant)</span>
+      <span className="legend-sep" aria-hidden="true" />
+      <span className="legend-group">NO LOCK</span>
+      <span className="legend-item"><span className="legend-swatch rc-occupied-no-lock" />Occupied — no lock</span>
+      <span className="legend-item"><span className="legend-swatch rc-no-lock" />Vacant — no lock</span>
+      <span className="legend-sep" aria-hidden="true" />
       <span className="legend-item"><span className="legend-swatch rc-vacant rc-fault-issue" />Ring = lock fault (red offline · orange low batt)</span>
     </div>
   );

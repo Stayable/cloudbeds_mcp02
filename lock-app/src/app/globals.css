@@ -255,9 +255,11 @@ details.accordion[open] > summary .accordion-chevron { transform: rotate(180deg)
 .spinner { width: 42px; height: 42px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.32); border-top-color: #fff; animation: lockapp-spin .8s linear infinite; }
 .overlay-label { color: #fff; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
 
-.legend { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin-top: 8px; }
 .legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--muted); }
 .legend-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+.legend-group { font-size: 10px; font-weight: 700; letter-spacing: .07em; color: var(--ink-2, #475569); text-transform: uppercase; }
+.legend-sep { width: 1px; height: 14px; background: var(--line, #d8dee8); display: inline-block; flex: 0 0 auto; }
 /* Per-card mini status cards: count per true lock status. */
 .statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .statmini { border: 1px solid #EAEEF4; border-radius: var(--radius-sm); padding: 8px 9px; background: var(--surface); }
