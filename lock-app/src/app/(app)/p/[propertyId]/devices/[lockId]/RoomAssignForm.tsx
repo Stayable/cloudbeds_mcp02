@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assignLockToRoom } from "@/app/(app)/lock-actions";
 import ActionError from "@/components/ActionError";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 interface RoomOption {
   roomId: string;
@@ -74,6 +75,7 @@ export default function RoomAssignForm({ lockId, propertyId }: { lockId: string;
         </select>
       </div>
       <button type="submit" className="btn btn-primary" style={{ height: 44 }} disabled={!roomId || pending}>{pending ? "Assigning…" : "Assign"}</button>
+      {pending && <LoadingOverlay label="Assigning lock & writing backup codes… this can take up to ~20s if the lock is offline. Please wait." />}
       {actionError && <ActionError message={actionError} onClose={() => setActionError(null)} />}
       {status === "no-key" && (
         <span className="mono" style={{ flexBasis: "100%", fontSize: 11, color: "#9A5E00" }}>No Cloudbeds key for this property — add CLOUDBEDS_API_KEY_{propertyId}.</span>

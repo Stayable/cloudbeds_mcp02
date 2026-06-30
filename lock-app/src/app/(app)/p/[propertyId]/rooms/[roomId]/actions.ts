@@ -261,6 +261,8 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
       startTs: BigInt(0), endTs: BigInt(0), status: "active", type: "backup", backupSlot: slot,
     },
   });
+  // The lock just accepted a write → it's reachable. Clear any stale offline flag.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
   if (old) {
     // Best-effort delete of the previous code; the new one is already live, so a
     // failure here must not surface as an error (it would imply rotation failed).

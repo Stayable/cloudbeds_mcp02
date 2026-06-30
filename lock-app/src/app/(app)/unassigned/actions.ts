@@ -11,8 +11,8 @@ import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
-import { mapActionError } from "@/lib/action-result";
 import { revokeAllCodesForLock, generateBackupCodesForRoom } from "@/lib/backup-codes";
+import { BACKUP_SLOTS } from "@/lib/door-detail";
 
 export interface SyncState {
   ran: boolean;
@@ -113,21 +113,29 @@ export async function assignUnassignedLock(formData: FormData): Promise<void> {
   await prisma.unassignedLock.deleteMany({ where: { lockId } });
 
   // Same backup-code lifecycle as the lock/room-detail assign: revoke whatever
-  // rode along on this physical lock, then mint a fresh set of 5 for the new room.
-  // A TTLock failure must NOT fail the assignment — mark the lock offline + log,
-  // the codes can be generated later (and the reason shows on the lock detail).
-  let backupNote = "";
-  try {
-    await revokeAllCodesForLock(lockId);
-    const { created } = await generateBackupCodesForRoom({ propertyId, roomId, lockId });
-    backupNote = `, ${created} backup codes`;
-  } catch (e) {
+  // rode along on this physical lock, then mint a fresh set for the new room. The
+  // generator is resilient + throttled; judge by COUNT (0 = offline, partial =
+  // keep online + log, full = clears any stale offline flag).
+  await revokeAllCodesForLock(lockId);
+  const gen = await generateBackupCodesForRoom({ propertyId, roomId, lockId });
+  let backupNote: string;
+  if (gen.created === 0) {
     await prisma.lockMap.updateMany({ where: { lockId }, data: { online: false } });
     await writeAudit(user, {
       action: "backup_autogen_failed", propertyId, roomId, lockId,
-      detail: buildDetail({ outcome: "warning", message: `backup auto-generate failed: ${mapActionError(e)}` }),
+      detail: buildDetail({ outcome: "warning", message: `backup codes could not be written — lock unreachable: ${gen.errors[0] ?? "unknown error"}`, extra: { errors: gen.errors } }),
     });
     backupNote = " (backup codes pending — lock unreachable)";
+  } else if (gen.created < BACKUP_SLOTS) {
+    await prisma.lockMap.updateMany({ where: { lockId }, data: { online: true } });
+    await writeAudit(user, {
+      action: "backup_autogen_partial", propertyId, roomId, lockId,
+      detail: buildDetail({ outcome: "warning", message: `${gen.created}/${BACKUP_SLOTS} backup codes created; ${gen.failed} failed — open the room and rotate the missing slots`, extra: { errors: gen.errors } }),
+    });
+    backupNote = `, ${gen.created}/${BACKUP_SLOTS} backup codes (some need a retry)`;
+  } else {
+    await prisma.lockMap.updateMany({ where: { lockId }, data: { online: true } });
+    backupNote = `, ${gen.created} backup codes`;
   }
 
   await writeAudit(user, {

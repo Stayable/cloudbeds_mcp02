@@ -272,7 +272,7 @@ export default async function DoorDetailPage({
                   <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>Removing renames the lock to “{poolName ?? "(unassigned)"}” and returns it to this property’s available pool.</p>
                 </>
               ) : availableLocks.length > 0 ? (
-                <ActionForm action={assignLockToRoom} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <ActionForm action={assignLockToRoom} loadingLabel="Assigning lock & writing backup codes… this can take up to ~20s if the lock is offline. Please wait." style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <input type="hidden" name="propertyId" value={propertyId} />
                   <input type="hidden" name="roomId" value={roomId} />
                   <div style={{ flex: 1, minWidth: 160 }}>

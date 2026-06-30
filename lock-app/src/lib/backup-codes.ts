@@ -13,6 +13,14 @@ import { createPasscode, deletePasscode } from "./ttlock";
 import { generatePin, BACKUP_PWD_TYPE } from "./passcodes";
 import { BACKUP_SLOTS } from "./door-detail";
 
+// TTLock rate-limits rapid writes to the same lock. An assign fires several in a
+// row (rename → delete old codes → create N new), so doing them back-to-back makes
+// the later calls fail. Space every TTLock write out, and back off before a single
+// retry. Slower, but the assign shows a loading overlay so it's clearly working.
+const TTLOCK_WRITE_SPACING_MS = 700;
+const BACKUP_RETRY_BACKOFF_MS = 1500;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
  * Generate `n` DISTINCT PINs. TTLock rejects two identical passcodes on the same
  * lock, so the five backup slots must not collide. Pure (generator injected) so
@@ -36,9 +44,10 @@ export function makeDistinctPins(n: number, generate: () => string = generatePin
 export async function revokeAllCodesForLock(lockId: bigint): Promise<{ revoked: number; failed: number }> {
   const codes = await prisma.passcode.findMany({ where: { lockId, status: "active" } });
   let failed = 0;
-  for (const c of codes) {
+  for (let i = 0; i < codes.length; i++) {
+    if (i > 0) await sleep(TTLOCK_WRITE_SPACING_MS); // space the deletes so they don't rate-limit each other / the creates that follow
     try {
-      await deletePasscode({ lockId: c.lockId, keyboardPwdId: c.keyboardPwdId });
+      await deletePasscode({ lockId: codes[i].lockId, keyboardPwdId: codes[i].keyboardPwdId });
     } catch {
       failed++; // leave it: still mark revoked so the app stops trusting it; physical drift surfaces on sync-from-lock
     }
@@ -51,31 +60,48 @@ export async function revokeAllCodesForLock(lockId: bigint): Promise<{ revoked: 
 
 /**
  * Provision a fresh, full set of BACKUP_SLOTS permanent staff codes on `lockId`
- * for the given room. Throws on the first TTLock failure (e.g. -2012 gateway
- * offline) — callers wrap this so a failure degrades gracefully rather than
- * leaving a half-coded lock unmapped.
+ * for the given room. RESILIENT: never throws and never aborts the batch on one
+ * failure — each slot is attempted (with one spaced retry) independently, so a
+ * single rate-limited/transient error doesn't strand the other slots. Returns
+ * how many were created so the caller can tell "all good" / "partial" / "none".
  */
 export async function generateBackupCodesForRoom(args: {
   propertyId: string;
   roomId: string;
   lockId: bigint;
-}): Promise<{ created: number }> {
+}): Promise<{ created: number; failed: number; errors: string[] }> {
   const { propertyId, roomId, lockId } = args;
   const pins = makeDistinctPins(BACKUP_SLOTS);
   let created = 0;
+  const errors: string[] = [];
+
   for (let slot = 1; slot <= BACKUP_SLOTS; slot++) {
+    // Space EVERY create (incl. the first — gives the preceding rename/deletes
+    // room to settle before we start writing codes).
+    await sleep(TTLOCK_WRITE_SPACING_MS);
     const pin = pins[slot - 1];
-    const { keyboardPwdId } = await createPasscode({
-      lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
-    });
-    await prisma.passcode.create({
-      data: {
-        reservationId: null, propertyId, roomId, lockId,
-        keyboardPwdId: BigInt(keyboardPwdId), pin,
-        startTs: BigInt(0), endTs: BigInt(0), status: "active", type: "backup", backupSlot: slot,
-      },
-    });
-    created++;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await sleep(BACKUP_RETRY_BACKOFF_MS);
+      try {
+        const { keyboardPwdId } = await createPasscode({
+          lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
+        });
+        await prisma.passcode.create({
+          data: {
+            reservationId: null, propertyId, roomId, lockId,
+            keyboardPwdId: BigInt(keyboardPwdId), pin,
+            startTs: BigInt(0), endTs: BigInt(0), status: "active", type: "backup", backupSlot: slot,
+          },
+        });
+        created++;
+        lastErr = undefined;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (lastErr) errors.push(`slot ${slot}: ${(lastErr as { message?: string })?.message ?? String(lastErr)}`);
   }
-  return { created };
+  return { created, failed: BACKUP_SLOTS - created, errors };
 }

@@ -1,8 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { PROPERTIES } from "@/lib/properties";
 import { assignUnassignedLock } from "./actions";
+import LoadingOverlay from "@/components/LoadingOverlay";
+
+/** Submit button with a pending state — the assign does several TTLock calls
+ *  (rename + revoke + write 5 backup codes), which can take a while on an
+ *  offline lock, so we disable + show an overlay so it's clearly working. */
+function AssignSubmit({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <>
+      {pending && <LoadingOverlay label="Assigning lock & writing backup codes… this can take up to ~20s if the lock is offline. Please wait." />}
+      <button type="submit" className="btn btn-primary" style={{ height: 38 }} disabled={disabled || pending}>
+        {pending ? "Assigning…" : "Assign"}
+      </button>
+    </>
+  );
+}
 
 interface RoomOption {
   roomId: string;
@@ -90,7 +107,7 @@ export default function AssignForm({ lockId, guessRoom, defaultPropertyId = "" }
         ))}
       </select>
 
-      <button type="submit" className="btn btn-primary" style={{ height: 38 }} disabled={!roomId}>Assign</button>
+      <AssignSubmit disabled={!roomId} />
 
       {status === "no-key" && (
         <span className="mono" style={{ flexBasis: "100%", textAlign: "right", fontSize: 11, color: "#9A5E00" }}>
