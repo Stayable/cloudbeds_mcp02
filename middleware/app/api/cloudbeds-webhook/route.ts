@@ -79,8 +79,9 @@ export async function POST(req: Request) {
     if (intent === "revoke") {
       // A real checkout earns the configured grace headroom; cancel / no-show /
       // deleted revoke immediately (no guest to give headroom to).
-      const grace = isCheckout(payload) ? (await getGraceSettings()).checkoutGraceMinutes : 0;
-      result = await revokePasscodes(reservationId, payload.event, grace);
+      const checkout = isCheckout(payload);
+      const grace = checkout ? (await getGraceSettings()).checkoutGraceMinutes : 0;
+      result = await revokePasscodes(reservationId, payload.event, grace, { registry, propertyId, checkout });
     } else if (intent === "reconcile") {
       result = await reconcilePasscodes(registry, payload);
     } else {

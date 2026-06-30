@@ -19,6 +19,8 @@ import {
   roomNameFor,
 } from "./cloudbeds";
 import { createPasscode, deletePasscode, changePasscodePeriod } from "./ttlock";
+import { notifyGuestCode } from "./guest-notify";
+import type { GuestEmailKind } from "./guest-email";
 import {
   classifyIntent,
   reservationNoteBody,
@@ -232,7 +234,7 @@ export async function ensurePasscodes(
   for (const roomId of roomIds) {
     await createPasscodeForRoom(
       registry, payload, detail,
-      { propertyId, reservationId, roomId, paidInFull, startTs, endTs },
+      { propertyId, reservationId, roomId, paidInFull, startTs, endTs, emailKind: "generated" },
       result,
     );
   }
@@ -251,10 +253,10 @@ async function createPasscodeForRoom(
   registry: CloudbedsRegistry,
   payload: ReservationWebhookPayload,
   detail: ReservationDetail,
-  args: { propertyId: string; reservationId: string; roomId: string; paidInFull: boolean; startTs: number; endTs: number },
+  args: { propertyId: string; reservationId: string; roomId: string; paidInFull: boolean; startTs: number; endTs: number; emailKind: GuestEmailKind },
   result: SyncResult,
 ): Promise<void> {
-  const { propertyId, reservationId, roomId, paidInFull, startTs, endTs } = args;
+  const { propertyId, reservationId, roomId, paidInFull, startTs, endTs, emailKind } = args;
 
   // Reflect occupancy + guest on the room so the lock-app shows guest details
   // (independent of whether the room is mapped to a lock).
@@ -421,6 +423,22 @@ async function createPasscodeForRoom(
         },
       });
     }
+
+    // Email the guest their new code (best-effort — a send failure must NEVER
+    // affect the PIN). "generated" on check-in, "room_changed" on a move. Fires
+    // once per code because this branch only runs when a NEW code is created (an
+    // existing active code returns earlier via the stay-extension path).
+    const roomNumber = roomNameFor(detail, roomId) || roomId;
+    const notified = await notifyGuestCode({
+      registry, propertyId, reservationId, roomNumber, kind: emailKind, doorCode: pin, detail,
+    });
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event: payload.event, propertyId, roomId, lockId: map.lockId,
+        action: notified.sent ? "guest_email_sent" : "guest_email_skipped",
+        detail: { reservationId, kind: emailKind, reason: notified.reason ?? null },
+      },
+    }).catch(() => {});
   } catch (err: any) {
     // Lost the create race: the unique activeKey rejected this insert because
     // another run already created THE active code for this (reservation, room).
@@ -485,6 +503,7 @@ export async function revokePasscodes(
   reservationId: string,
   event: string,
   graceMinutes = 0,
+  notify?: { registry: CloudbedsRegistry; propertyId: string; checkout: boolean },
 ): Promise<SyncResult> {
   const active = await prisma.passcode.findMany({
     where: { reservationId, status: "active" },
@@ -527,6 +546,32 @@ export async function revokePasscodes(
   // (e.g. a PIN that failed to create on an offline lock) — occupancy is tracked
   // independent of passcodes, so checkout/cancel/un-check-in must clear it too.
   await freeRoomsForReservation(reservationId);
+
+  // Checkout-only: thank the guest (no code shown). Sent ONCE — a retry finds no
+  // active codes (pinsRevoked 0) and skips. Cancel / no-show / un-check-in pass no
+  // `notify`, so they never email. Room-transfer revoke uses revokeOrExpire
+  // directly (not this fn), so it stays silent (the room_changed email covers it).
+  if (notify?.checkout && result.pinsRevoked > 0) {
+    const first = active[0];
+    let roomNumber = first?.roomId ?? "";
+    let detail;
+    try {
+      detail = await getReservation(notify.registry, notify.propertyId, reservationId);
+      if (first) roomNumber = roomNameFor(detail, first.roomId) || roomNumber;
+    } catch {
+      /* fall back to roomId for the email; never block checkout on a read */
+    }
+    const notified = await notifyGuestCode({
+      registry: notify.registry, propertyId: notify.propertyId, reservationId, roomNumber, kind: "revoked", detail,
+    });
+    await prisma.eventLog.create({
+      data: {
+        source: "webhook", event, propertyId: notify.propertyId,
+        action: notified.sent ? "guest_email_sent" : "guest_email_skipped",
+        detail: { reservationId, kind: "revoked", reason: notified.reason ?? null },
+      },
+    }).catch(() => {});
+  }
 
   return result;
 }
@@ -602,7 +647,7 @@ export async function reconcilePasscodes(
   for (const roomId of desired) {
     await createPasscodeForRoom(
       registry, payload, detail,
-      { propertyId, reservationId, roomId, paidInFull, startTs, endTs },
+      { propertyId, reservationId, roomId, paidInFull, startTs, endTs, emailKind: "room_changed" },
       result,
     );
   }
@@ -684,6 +729,7 @@ export async function reconcileCheckedInReservations(
   //    PIN is on a room they no longer occupy (definitive room change). Room-transfer
   //    grace keeps the old room's code working a few more minutes.
   const { transferGraceMinutes } = await getGraceSettings();
+  const movedReservations = new Set<string>(); // revoked a stale room ⇒ a move ⇒ "room_changed" email
   for (const pc of active) {
     const entry = pc.reservationId ? byRes.get(pc.reservationId) : undefined;
     // Skip unless we POSITIVELY know this reservation's current rooms (non-empty)
@@ -691,6 +737,7 @@ export async function reconcileCheckedInReservations(
     // the room), do NOT revoke — never strand a guest with no code on an unknown room.
     if (!entry || entry.desired.size === 0 || entry.desired.has(pc.roomId)) continue;
     const { mode, expiresAt } = await revokeOrExpire(pc, transferGraceMinutes);
+    if (pc.reservationId) movedReservations.add(pc.reservationId);
     result.pinsRevoked++;
     await prisma.roomState.upsert({
       where: { propertyId_roomId: { propertyId: pc.propertyId, roomId: pc.roomId } },
@@ -720,10 +767,11 @@ export async function reconcileCheckedInReservations(
     } catch {
       continue; // missing/bad dates on this reservation — skip rather than throw the whole cron
     }
+    const emailKind: GuestEmailKind = movedReservations.has(reservationId) ? "room_changed" : "generated";
     for (const roomId of desired) {
       await createPasscodeForRoom(
         registry, pseudo, detail,
-        { propertyId, reservationId, roomId, paidInFull, startTs: window.startTs, endTs: window.endTs },
+        { propertyId, reservationId, roomId, paidInFull, startTs: window.startTs, endTs: window.endTs, emailKind },
         result,
       );
     }

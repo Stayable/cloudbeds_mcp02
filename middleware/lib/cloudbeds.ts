@@ -195,6 +195,13 @@ export interface ReservationDetail {
   startDate?: string;
   endDate?: string;
   guestName?: string;
+  // Primary-guest contact is sometimes inline on the reservation; when absent we
+  // fall back to getGuest(guestID). Field names vary by Cloudbeds response shape.
+  guestID?: string | number;
+  guestEmail?: string;
+  email?: string;
+  guestPhone?: string;
+  phone?: string;
   balance?: number | string; // amount still owed; 0 (or credit) = paid in full
   // Guest-level check-in state lives here (guestStatus: checked_in / not_checked_in).
   guestList?: Record<string, { guestStatus?: string; roomID?: string; rooms?: ReservationRoom[]; [k: string]: unknown }>;
@@ -230,6 +237,33 @@ export async function getReservation(
     .resolve(propertyID)
     .get<ReservationDetail>("getReservation", { propertyID, reservationID });
   return (res.data ?? {}) as ReservationDetail;
+}
+
+/** A Cloudbeds guest record — used to read contact info for guest emails. */
+export interface GuestRecord {
+  guestID?: string | number;
+  guestEmail?: string;
+  email?: string;
+  guestPhone?: string;
+  phone?: string;
+  guestCellPhone?: string;
+  cellPhone?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Fetch a single guest record (contact info for door-code emails). Returns null
+ * when the property has no key configured.
+ */
+export async function getGuest(
+  registry: CloudbedsRegistry,
+  propertyID: string,
+  guestID: string,
+): Promise<GuestRecord | null> {
+  const client = registry.resolve(propertyID);
+  if (!client) return null;
+  const res = await client.get<GuestRecord>("getGuest", { propertyID, guestID });
+  return (res.data ?? {}) as GuestRecord;
 }
 
 /**
