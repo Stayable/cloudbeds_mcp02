@@ -3,8 +3,27 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-06-30 PM) — **Backup-code lifecycle + gateway-carry + gateway cron BUILT (TDD, typecheck+build+160 tests green). NOT committed/pushed yet.**
+WHAT SHIPPED THIS SESSION (uncommitted — push to auto-deploy lock-app + middleware):
+  • Accommodation webhooks REGISTERED all 8 props (room-change now event-driven; verified a live move worked). Reconcile cron relaxed */5→hourly (vercel.json, middleware) — uncommitted.
+  • BACKUP-CODE LIFECYCLE (decisions from BK: regenerate-on-transfer, auto-gen ALL 5 on assign):
+    - new lib/backup-codes.ts: makeDistinctPins (pure, TDD 3 tests), revokeAllCodesForLock (delete TTLock best-effort + mark revoked), generateBackupCodesForRoom (5 fresh permanent codes).
+    - lock-actions.ts assignLockToRoom: carries the lock's gatewayId onto the new mapping (NO "not connected" after transfer, no re-Sync) + revoke-all-then-generate-5 backups for the new room; TTLock failure (-2012 offline) degrades gracefully (mark lock offline + log backup_autogen_failed, assignment still succeeds, codes pending).
+    - unmapRoom: revokeAllCodesForLock before pooling (pooled lock = clean slate; fixes the orphan-codes bug BK found) + carries gatewayId into UnassignedLock.
+  • GATEWAY-STATUS CRON: lock-app /api/cron/gateway-status (CRON_SECRET-gated) runs syncGateways every */15 (vercel.json) — keeps gateway online/offline + lock→gateway links fresh without a manual Sync; backstop for the gatewayId carry. NEEDS Pro (team is on Pro).
+  • CLEANUP DONE: 10 orphan backup codes on test locks 25039233 + 27083179 marked revoked in DB (BK deletes the physical keypad codes manually in lock2.ttlock.com — PINs handed off in chat). Both locks now clean + unassigned.
+VERIFY LIVE NEXT (sandbox can't reach TTLock): assign a lock to a room → 5 backup codes auto-appear + gateway shows connected immediately (no Sync) → unmap → codes revoked + room shows none. Set CRON_SECRET on lock-app Vercel if not already (gateway cron auth).
+NOTE: "lock health (battery/online/lastSeen/gateway) is DB-cached, only refreshes on Sync/this new cron" — explains why 25039233 showed battery (cached 100) but 27083179 didn't (battery=null), both "not connected" after unmap.
+--- earlier ---
 RESUME HERE (2026-06-29 EOD) — Branch tip **6c71640**, all committed+pushed (origin even). Big day; lots shipped + a hard live-debug of room-change.
-⭐ NEXT (do first): **Register the accommodation webhooks** — `cd middleware && npx tsx scripts/register-accommodation-webhooks.ts` (dry run) then `--apply`. Run in a NORMAL terminal (not Claude sandbox — CB blocked here). If `--apply` 403s → key needs Webhooks/Notifications scope. This is THE fix for room-change reliability (see ROOT CAUSE below). BK hit "consistent errors" trying earlier — debug those (likely key scope or the script's env/endpoint-URL discovery).
+✅ DONE 2026-06-30: **Accommodation webhooks REGISTERED on all 8 properties** (`accommodation_changed` +
+  `accommodation_removed` → lock-middleware receiver). No 403 — keys have the scope. This is THE room-change
+  reliability fix (moves now come from the EVENT payload roomId/roomIdPrev, lag-immune). Only 210972 (Lakeland)
+  also has the older status_changed+deleted; the other 7 have ONLY the accommodation pair so far.
+⭐ NEXT (verify the fix): change a reservation's room in Cloudbeds (a property with a mapped lock — Lakeland) →
+  middleware event log should show `passcode_revoked (room_change)` on old room + `passcode_created` on new,
+  near-instant (no waiting on cron). If it fires, relax the */5 reconcile cron toward ~30 min (event = primary,
+  cron = backstop).
 ROOM-CHANGE ROOT CAUSE (confirmed live 2026-06-29): code logic is CORRECT (238→239 move worked end-to-end via cron). The blocker is **Cloudbeds read-API lag on room moves — and it's PER-KEY**: the middleware + lock-app use SEPARATE CB keys, and CB propagates a room change to them at different speeds (lock-app key showed 238 while middleware key still returned 239 for 10+ min → reconcile correctly saw "no change"). Polling (cron/resync) CANNOT beat this. The accommodation **webhook** sidesteps it: its payload carries roomId/roomIdPrev, and `reconcilePasscodes`→`reconcileDesiredRooms` already uses those hints, so the move happens from the EVENT, not a laggy getReservation read → instant + lag-immune.
 VERIFY-LATER (sandbox can't reach CB/Vercel): CRON_SECRET added to BOTH lock-app + lock-middleware in Vercel (BK) — confirm a redeploy picked it up. */5 cron confirmed firing (Settings→Cron, last runs every 5 min). Grace currently **0/0** (BK set for testing — revert to 10/10 or final values after).
 SHIPPED 2026-06-29 (all pushed; lock-app + lock-middleware ARE Git-connected, auto-deploy confirmed):
@@ -112,8 +131,10 @@ docs/superpowers/specs/2026-06-29-lock-app-gateway-status-and-graceful-errors-de
   via `inferGatewayProperty`, TDD; sets LockMap/UnassignedLock.gatewayId; stale-cleanup guarded vs empty
   response). Devices page Gateways section; new `/devices/gateways/[gatewayId]` detail page (status + served
   locks); lock-detail + room-detail cards show the connected gateway (name+status) linked. gateway-view.ts.
-- VERIFY LIVE (sandbox can't reach TTLock): run Sync → gateways populate; open Lakeland 239 → "not connected"
-  + generating a code shows the friendly modal, no crash; lock 238 → rapid rotate locks the button.
+- [x] VERIFIED LIVE 2026-06-30: ran Sync → Gateway table populated, lock cards show "lobby- Stay test · online".
+  Gotcha confirmed: gateway/lock status is DB-cached, only refreshes on Sync — "not connected" before Sync was
+  stale data, NOT real TTLock state (see memory lock-app-gateway-status-cached). Remaining to verify: friendly
+  gateway-offline modal (no crash) + lock-238 rapid-rotate button lock — needs an actually-offline lock to test.
 
 ROOM-CHANGE AUTO PLAN (2026-06-30):
 - Webhook does NOT fire on a pure room change for these accounts → caught only by the poll-reconcile cron

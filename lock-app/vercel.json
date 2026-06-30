@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/sync-occupancy", "schedule": "0 4 * * *" }
+    { "path": "/api/cron/sync-occupancy", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/gateway-status", "schedule": "*/15 * * * *" }
   ]
 }
