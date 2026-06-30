@@ -47,6 +47,8 @@ export async function revokeGuestCode(propertyId: string, roomId: string): Promi
   }
   // Null activeKey so the duplicate-PIN guard frees this (reservation, room) slot.
   await prisma.passcode.update({ where: { id: code.id }, data: { status: "revoked", activeKey: null } });
+  // The lock just accepted a delete → it's reachable. Clear any stale offline flag.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
 
   // Notify the guest their code was deactivated (best-effort, no code shown). This
   // is the safeguard for a standalone revoke (e.g. Revoke pressed instead of
@@ -134,6 +136,8 @@ export async function resendGuestCode(propertyId: string, roomId: string): Promi
     }
     throw e;
   }
+  // The lock just accepted a write → it's reachable. Clear any stale offline flag.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
 
   const label = map.alias?.trim() || map.roomName?.trim() || roomId;
   await postReservationNote(registry, propertyId, reservationId, `${label}-${pin}`).catch(() => {});
@@ -188,6 +192,8 @@ export async function generateManualCode(formData: FormData): Promise<ActionResu
       startTs: BigInt(startTs), endTs: BigInt(endTs), status: "active", type: "manual",
     },
   });
+  // The lock just accepted a write → it's reachable. Clear any stale offline flag.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
   await writeAudit(user, {
     action: "manual_code_created", propertyId, roomId, lockId: map.lockId,
     detail: buildDetail({ extra: { hours, keyboardPwdId: String(keyboardPwdId) } }),
@@ -300,6 +306,8 @@ export async function syncFromLock(propertyId: string, roomId: string): Promise<
   } catch (e) {
     return { ok: false, error: mapActionError(e) };
   }
+  // The lock answered the list call → it's reachable. Clear any stale offline flag.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
   const drift = detectDrift(
     active.map((p) => String(p.keyboardPwdId)),
     list.map((p) => String(p.keyboardPwdId)),
