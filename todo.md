@@ -3,6 +3,27 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-07-01 latest) — **All shipped + pushed (branch tip ce3c008; lock-app 175 + middleware 42 tests green, both build).** Auto-deploys live.
+NEWEST (2026-07-01, after the room-transfer fix below):
+  • ⭐ TTLock errcode 3003 "gateway is busy" was misread as OFFLINE (the retry/offline checks matched the bare
+    word "gateway") → no retry, room marked red, create abandoned. THIS caused BK's transfer mess (destination red
+    no-code, then 2 rooms same guest+code after a manual resend). FIX: new isUnreachableLockError (lock-app
+    action-result.ts + middleware local copy) matches ONLY -2012 / "not connected" / "no gateway", NOT "busy".
+    Wired into both retry loops + all 6 offline-flag sites → 3003/busy now RETRIES (3x, fresh PIN, backoff).
+  • Backup ROTATE now revokes ALL active codes in a slot (fixes the "2 Backup 1 codes" duplicate).
+  • RevealButton remounts on keyboardPwdId (React key) → a rotate/resend no longer shows the OLD code until a
+    manual refresh (BK bug #1).
+  • Legend grouped: "LOCK INSTALLED" (ok/low-batt/offline/vacant) vs "NO LOCK" (occupied-no-lock/vacant-no-lock)
+    with divider — grey-vacant (has lock) vs black (no lock) now obvious.
+  • USERS: 7 now, ALL super_admin/ALL scope: bke@rise8, rb@rise8, admin@rentstayable, bke@rentstayable,
+    kate@rentstayable, gerardo@rentstayable, + crystal@rentstayable (added this session, in seed-users.ts + prod
+    Neon). OPEN: placeholder names (Admin/Rob/Kate/Crystal); Gerardo+Crystal maybe should be scoped (not super_admin).
+  VERIFY LIVE NEXT: redo a room transfer end-to-end — should now revoke origin → create destination (retrying
+    through any 3003 "busy") → both rooms correct WITHOUT a manual resync. Rotate a backup → new code shows
+    immediately (no refresh). If a create still fails after 3 tries, Activity log (/p/<id>/activity) has the raw errcode.
+  STILL EVENTUAL-CONSISTENCY (not fully fixable w/o live test): room-change "which room left" relies on webhook
+    payload hints + reconcile; manual Re-sync remains the backstop but should rarely be needed now that creates retry.
+--- earlier 2026-07-01 ---
 RESUME HERE (2026-07-01 late) — **All shipped + pushed (branch tip 56ae7ec; lock-app 175 + middleware 42 tests green, both build).** Auto-deploys live.
 LATEST (2026-07-01 PM, after the email/status work below):
   • ROOM-TRANSFER GUEST CODE FIX (BK found: transfer 231→233 revoked old room but new code didn't generate;
