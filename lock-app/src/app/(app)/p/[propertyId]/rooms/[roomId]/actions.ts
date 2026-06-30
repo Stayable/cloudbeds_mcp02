@@ -258,6 +258,15 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
       lockId: map.lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
     }));
   } catch (e) {
+    // Log the RAW TTLock error (errcode/errmsg) so a "something went wrong" is
+    // diagnosable from the Activity log — the friendly text alone hides the code.
+    const raw = e instanceof Error ? e.message : String(e);
+    const offline = /-2012|not connected|gateway/i.test(raw);
+    if (offline) await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
+    await writeAudit(user, {
+      action: "backup_code_rotate_failed", propertyId, roomId, lockId: map.lockId,
+      detail: buildDetail({ outcome: "warning", message: raw, extra: { slot, offline } }),
+    }).catch(() => {});
     return { ok: false, error: mapActionError(e) };
   }
   await prisma.passcode.create({
