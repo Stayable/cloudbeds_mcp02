@@ -11,6 +11,8 @@ import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
+import { mapActionError } from "@/lib/action-result";
+import { revokeAllCodesForLock, generateBackupCodesForRoom } from "@/lib/backup-codes";
 
 export interface SyncState {
   ran: boolean;
@@ -90,6 +92,12 @@ export async function assignUnassignedLock(formData: FormData): Promise<void> {
   const name = canonicalLockName(propertyId, room);
   if (!name) throw new Error("Unknown property or empty room");
 
+  // The gateway↔lock binding is physical — carry the lock's existing gatewayId
+  // onto the new mapping so the room doesn't read "not connected" until a Sync.
+  const priorMap = await prisma.lockMap.findFirst({ where: { lockId }, select: { gatewayId: true } });
+  const priorPool = priorMap ? null : await prisma.unassignedLock.findUnique({ where: { lockId }, select: { gatewayId: true } });
+  const carryGatewayId = priorMap?.gatewayId ?? priorPool?.gatewayId ?? null;
+
   // Rename in TTLock first — if this fails (e.g. gateway/lock unreachable) we
   // surface the error and leave the queue untouched rather than mapping a lock
   // whose real name doesn't match.
@@ -97,19 +105,37 @@ export async function assignUnassignedLock(formData: FormData): Promise<void> {
 
   await prisma.lockMap.upsert({
     where: { propertyId_roomId: { propertyId, roomId } },
-    create: { propertyId, roomId, roomName: room, lockId, alias: name },
-    update: { lockId, roomName: room, alias: name },
+    create: { propertyId, roomId, roomName: room, lockId, alias: name, gatewayId: carryGatewayId },
+    update: { lockId, roomName: room, alias: name, gatewayId: carryGatewayId },
   });
   // One mapping per lock: drop any other rows for this lockId, clear the queue.
   await prisma.lockMap.deleteMany({ where: { lockId, NOT: { propertyId, roomId } } });
   await prisma.unassignedLock.deleteMany({ where: { lockId } });
+
+  // Same backup-code lifecycle as the lock/room-detail assign: revoke whatever
+  // rode along on this physical lock, then mint a fresh set of 5 for the new room.
+  // A TTLock failure must NOT fail the assignment — mark the lock offline + log,
+  // the codes can be generated later (and the reason shows on the lock detail).
+  let backupNote = "";
+  try {
+    await revokeAllCodesForLock(lockId);
+    const { created } = await generateBackupCodesForRoom({ propertyId, roomId, lockId });
+    backupNote = `, ${created} backup codes`;
+  } catch (e) {
+    await prisma.lockMap.updateMany({ where: { lockId }, data: { online: false } });
+    await writeAudit(user, {
+      action: "backup_autogen_failed", propertyId, roomId, lockId,
+      detail: buildDetail({ outcome: "warning", message: `backup auto-generate failed: ${mapActionError(e)}` }),
+    });
+    backupNote = " (backup codes pending — lock unreachable)";
+  }
 
   await writeAudit(user, {
     action: "unassigned_lock_assigned",
     propertyId,
     roomId,
     lockId,
-    detail: buildDetail({ message: `assigned + renamed to ${name} (room ${room} → ${roomId})`, extra: { lockId: lockIdRaw, name, room, roomId } }),
+    detail: buildDetail({ message: `assigned + renamed to ${name} (room ${room} → ${roomId})${backupNote}`, extra: { lockId: lockIdRaw, name, room, roomId } }),
   });
   revalidatePath("/unassigned");
 }

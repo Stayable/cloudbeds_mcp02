@@ -7,6 +7,7 @@ import { loadGuestDetails } from "@/lib/guest-loader";
 import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
+import { latestLockFault } from "@/lib/lock-fault";
 import Forbidden from "@/components/Forbidden";
 import AutoRefresh from "@/components/AutoRefresh";
 import ActionButton from "@/components/ActionButton";
@@ -72,6 +73,7 @@ export default async function DoorDetailPage({
   const roomNumber = resolvedNumber || roomId;
   const label = map?.alias?.trim() || roomNumber;
   const gateway = map?.gatewayId ? await prisma.gateway.findUnique({ where: { gatewayId: map.gatewayId } }) : null;
+  const lockFault = map && !map.online ? await latestLockFault(map.lockId) : null;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -226,6 +228,14 @@ export default async function DoorDetailPage({
                   <span className={`pill ${map.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{map.online ? "online" : "offline"}</span>
                   {map.lastSeen && <span className="subtle" style={{ fontSize: 12 }}>Seen {map.lastSeen.toISOString().slice(0, 16).replace("T", " ")}</span>}
                 </div>
+                {lockFault && (
+                  <div style={{ background: "var(--crit-bg, #fdf0f0)", border: "1px solid var(--crit-line, #f3c9c9)", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--crit-ink)" }}>Why offline</div>
+                    <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>{lockFault.title}.</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{lockFault.message}</div>
+                    <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>{lockFault.at.toISOString().slice(0, 16).replace("T", " ")} UTC · clears on the next successful action or a Sync</div>
+                  </div>
+                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", width: 58 }}>Battery</span>
                   <div className="batt-track"><div className="batt-bar" style={{ width: `${battery ?? 0}%`, background: battery != null && battery < 20 ? "var(--crit)" : "var(--ok)" }} /></div>

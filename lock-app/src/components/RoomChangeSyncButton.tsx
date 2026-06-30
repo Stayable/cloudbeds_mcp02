@@ -29,7 +29,6 @@ export default function RoomChangeSyncButton({ propertyId }: { propertyId: strin
     <form action={action} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       <input type="hidden" name="propertyId" value={propertyId} />
       <Submit />
-      <span className="chip chip-warn" style={{ fontSize: 10 }}>TEST</span>
       {state.error && <span style={{ fontSize: 12, color: "var(--crit-ink)" }}>Error: {state.error}</span>}
       {state.ran && !state.error && state.created != null && (
         <span className="subtle" style={{ fontSize: 12 }}>{state.created} created · {state.revoked} revoked</span>
