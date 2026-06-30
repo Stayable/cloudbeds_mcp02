@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { guessRoomNumber, propertyFromLockName } from "@/lib/lock-naming";
+import { latestLockFault, type LockFault } from "@/lib/lock-fault";
 import Forbidden from "@/components/Forbidden";
 import SyncButton from "./SyncButton";
 import AssignForm from "./AssignForm";
@@ -12,6 +13,9 @@ export default async function UnassignedPage() {
   if (!sessionCan(user, "lock.discover")) return <Forbidden what="lock onboarding" />;
   const canAssign = sessionCan(user, "mapping.edit");
   const queue = await prisma.unassignedLock.findMany({ orderBy: { discoveredAt: "asc" } });
+  // Why-offline reason for any pooled lock currently flagged offline.
+  const faults = new Map<string, LockFault | null>();
+  await Promise.all(queue.filter((l) => !l.online).map(async (l) => faults.set(l.lockId.toString(), await latestLockFault(l.lockId))));
 
   return (
     <div>
@@ -53,6 +57,13 @@ export default async function UnassignedPage() {
                 <span className={`pill ${l.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{l.online ? "online" : "offline"}</span>
                 {canAssign && (
                   <AssignForm lockId={l.lockId.toString()} guessRoom={guessRoomNumber(l.name)} defaultPropertyId={propertyFromLockName(l.name)} />
+                )}
+                {!l.online && faults.get(l.lockId.toString()) && (
+                  <div style={{ flexBasis: "100%", background: "var(--crit-bg, #fdf0f0)", border: "1px solid var(--crit-line, #f3c9c9)", borderRadius: 8, padding: "10px 12px" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--crit-ink)" }}>Why offline: </span>
+                    <span style={{ fontSize: 12, color: "var(--ink)" }}>{faults.get(l.lockId.toString())!.title}. </span>
+                    <span style={{ fontSize: 12, color: "var(--muted)" }}>{faults.get(l.lockId.toString())!.message}</span>
+                  </div>
                 )}
               </div>
             );
