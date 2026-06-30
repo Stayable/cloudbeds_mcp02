@@ -3,6 +3,22 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-07-01 late) — **All shipped + pushed (branch tip 56ae7ec; lock-app 175 + middleware 42 tests green, both build).** Auto-deploys live.
+LATEST (2026-07-01 PM, after the email/status work below):
+  • ROOM-TRANSFER GUEST CODE FIX (BK found: transfer 231→233 revoked old room but new code didn't generate;
+    green block lit but no code). ROOT CAUSE from event log: middleware revoked old room, then create on new room
+    failed with **TTLock errcode=1** ("failed" — generic; gateway didn't relay OR the random guest PIN collided
+    with one of the 5 backup codes now on that lock), and the create did NOT retry → guest stranded; occupancy
+    showed green because it's written BEFORE the PIN attempt. FIX: middleware createPasscodeForRoom retries the
+    lock write 3x w/ fresh PIN + 2s backoff (real -2012/gateway bails immediately). Room detail now shows a loud
+    amber "Occupied, but no active door code" warning (was a subtle line).
+  • Same retry+regenerate added to LOCK-APP creates (rotate / resend / manual) via new lib/ttlock-retry.ts
+    (createPasscodeWithRetry). Backup rotate also logs the RAW TTLock error (backup_code_rotate_failed) so a
+    "something went wrong" is diagnosable.
+  • TO UNSTICK res 1120956100577 in room 233: hit "Resend code" on 233 (retry should land it now).
+  • OPEN: BK still to retry the rotate that hit errcode=1 (now instrumented + retried) — if it STILL fails after
+    3 tries, the Activity log has the raw errcode → real per-lock issue, not transience.
+--- earlier 2026-07-01 ---
 RESUME HERE (2026-07-01) — **Guest emails (redesigned by Claude Design) + backup/assign hardening all SHIPPED + pushed (branch tip 3bff7af; lock-app 175 tests green, both build).** Auto-deploys live.
 DONE 2026-07-01:
   • GUEST + OTP EMAILS: Claude Design "Stayable Email System" applied to all 6 guest templates + OTP
