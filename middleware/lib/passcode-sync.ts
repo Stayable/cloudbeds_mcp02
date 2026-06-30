@@ -125,6 +125,8 @@ function generatePin(): string {
   return String(randomInt(min, max));
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
  * Convert a Cloudbeds date range (YYYY-MM-DD) into a TTLock validity window in
  * epoch-ms. We open the code at the start of the arrival day and expire it at
@@ -355,16 +357,31 @@ async function createPasscodeForRoom(
     return;
   }
 
-  const pin = generatePin();
+  let pin = generatePin();
   let keyboardPwdId: number | undefined;
   try {
-    ({ keyboardPwdId } = await createPasscode({
-      lockId: map.lockId,
-      passcode: pin,
-      startDate: startTs,
-      endDate: endTs,
-      name: `Res ${reservationId}`,
-    }));
+    // TTLock returns a generic errcode=1 ("failed") when a gateway-relayed write
+    // doesn't land (lock briefly unreachable) or the PIN collides with an existing
+    // code on the lock (e.g. one of the 5 backup codes). Retry with a fresh PIN +
+    // backoff so a transfer's new code self-heals instead of stranding the guest.
+    // A real gateway/-2012 error won't recover → bail to the catch immediately.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        ({ keyboardPwdId } = await createPasscode({
+          lockId: map.lockId,
+          passcode: pin,
+          startDate: startTs,
+          endDate: endTs,
+          name: `Res ${reservationId}`,
+        }));
+        break;
+      } catch (e: any) {
+        const m = e?.message ?? String(e);
+        if (attempt >= 2 || /-2012|not connected|gateway/i.test(m)) throw e;
+        await sleep(2000);
+        pin = generatePin();
+      }
+    }
 
     // activeKey is UNIQUE: if a concurrent run (cron vs webhook) already created
     // THE active code for this (reservation, room), this insert throws P2002 and

@@ -144,7 +144,14 @@ export default async function DoorDetailPage({
               </>
             ) : (
               <>
-                <p className="subtle">No active guest code.</p>
+                {state?.currentReservationId ? (
+                  <div style={{ background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 8, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--warn-ink)" }}>Occupied, but no active door code</div>
+                    <div style={{ fontSize: 12, color: "var(--ink)", marginTop: 2 }}>The guest can&apos;t get in — resend to generate one (the last code write may have failed; check the lock).</div>
+                  </div>
+                ) : (
+                  <p className="subtle">No active guest code.</p>
+                )}
                 {can("guest_code.generate_manual") && map && state?.currentReservationId && (
                   <div style={{ marginTop: 12 }}>
                     <RevealButton variant="onLight" label="Resend code" action={async () => { "use server"; return resendGuestCode(propertyId, roomId); }} />
