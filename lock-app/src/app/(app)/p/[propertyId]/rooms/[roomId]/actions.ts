@@ -127,13 +127,16 @@ export async function resendGuestCode(propertyId: string, roomId: string): Promi
   const label = map.alias?.trim() || map.roomName?.trim() || roomId;
   await postReservationNote(registry, propertyId, reservationId, `${label}-${pin}`).catch(() => {});
 
-  // Email the guest their refreshed code (best-effort — never blocks the resend).
+  // Email the guest in TWO parts (best-effort — never blocks the resend): first
+  // that the old code is deactivated, then the new code. Order matters for the
+  // inbox, so send sequentially.
   const roomNumber = map.roomName?.trim() || roomId;
-  const notified = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "updated", doorCode: pin });
+  const revokedEmail = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "code_revoked" });
+  const generatedEmail = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "generated", doorCode: pin });
 
   await writeAudit(user, {
     action: "guest_code_resent", propertyId, roomId, lockId: map.lockId,
-    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId), emailSent: notified.sent, emailReason: notified.reason } }),
+    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId), revokedEmailSent: revokedEmail.sent, generatedEmailSent: generatedEmail.sent, emailReason: revokedEmail.reason ?? generatedEmail.reason } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true, data: { pin } };

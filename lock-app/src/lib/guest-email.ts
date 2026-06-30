@@ -23,7 +23,7 @@ const INK = "#08152B";
 export const GUEST_EMAIL_SENDER = "Stayable <blake@rentstayable.com>";
 export const GUEST_EMAIL_REPLY_TO = "blake@rentstayable.com";
 
-export type GuestEmailKind = "generated" | "updated" | "room_changed" | "revoked";
+export type GuestEmailKind = "generated" | "updated" | "room_changed" | "revoked" | "code_revoked";
 
 export interface GuestEmailData {
   guestFirstName?: string | null;
@@ -102,6 +102,17 @@ export function buildGuestEmail(kind: GuestEmailKind, data: GuestEmailData): { s
       <p style="margin:0;">It was a pleasure hosting you — we'd love to welcome you back anytime. Safe travels!</p>`;
     const text = `Thank you, ${name}.\n\nWe hope you enjoyed your stay in ${at}. Your door code has now been deactivated as your stay has ended.\n\nIt was a pleasure hosting you — we'd love to welcome you back anytime. Safe travels!\n\nQuestions? Just reply to this email.`;
     return { subject, html: shell(inner, `Thank you for staying at ${property}.`), text };
+  }
+
+  if (kind === "code_revoked") {
+    // Part 1 of the re-issue pair: the OLD code is dead; a "generated" email with
+    // the new code follows. (Distinct from "revoked", the end-of-stay thank-you.)
+    const subject = `Your door code for Room ${room} has been deactivated`;
+    const inner = `<h2 style="color:${NAVY};margin:0 0 6px;font-size:22px;">${esc(name)},</h2>
+      <p style="margin:0 0 12px;">The door code for ${esc(at)} has been deactivated and no longer works.</p>
+      <p style="margin:0;">A new door code is on its way — look for a separate email with your new code in a moment.</p>`;
+    const text = `${name},\n\nThe door code for ${at} has been deactivated and no longer works.\n\nA new door code is on its way — look for a separate email with your new code in a moment.\n\nQuestions? Just reply to this email.`;
+    return { subject, html: shell(inner, `Your Room ${room} door code has been deactivated.`), text };
   }
 
   // Code-bearing kinds.

@@ -32,8 +32,9 @@ describe("propertyDisplayName", () => {
 // Parity guard: the middleware copy of buildGuestEmail must behave like lock-app's.
 describe("buildGuestEmail (middleware copy)", () => {
   const base = { guestFirstName: "Alex", propertyName: "Stayable Lakeland", roomNumber: "239", doorCode: "794490" };
-  it("generated shows the code; revoked hides it", () => {
+  it("generated shows the code; revoked + code_revoked hide it", () => {
     expect(buildGuestEmail("generated", base).html).toContain("794490");
     expect(buildGuestEmail("revoked", { ...base, doorCode: null }).html).not.toContain("794490");
+    expect(buildGuestEmail("code_revoked", { ...base, doorCode: null }).subject.toLowerCase()).toContain("deactivated");
   });
 });
