@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
-import { createPasscode, deletePasscode, listPasscodes } from "@/lib/ttlock";
-import { generatePin, manualValidityWindow, guestValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
+import { deletePasscode, listPasscodes } from "@/lib/ttlock";
+import { createPasscodeWithRetry } from "@/lib/ttlock-retry";
+import { manualValidityWindow, guestValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
 import { BACKUP_SLOTS } from "@/lib/door-detail";
 import { CloudbedsRegistry, getReservation, postReservationNote } from "@/lib/cloudbeds";
 import { detectDrift } from "@/lib/reconcile";
@@ -109,13 +110,12 @@ export async function resendGuestCode(propertyId: string, roomId: string): Promi
     await prisma.passcode.update({ where: { id: pc.id }, data: { status: "revoked", activeKey: null } });
   }
 
-  const pin = generatePin();
-  let keyboardPwdId: number;
+  let pin: string, keyboardPwdId: number;
   try {
-    ({ keyboardPwdId } = await createPasscode({
-      lockId: map.lockId, passcode: pin, keyboardPwdType: PERIOD_PWD_TYPE,
+    ({ pin, keyboardPwdId } = await createPasscodeWithRetry((p) => ({
+      lockId: map.lockId, passcode: p, keyboardPwdType: PERIOD_PWD_TYPE,
       startDate: window.startTs, endDate: window.endTs, name: `Res ${reservationId}`,
-    }));
+    })));
   } catch (e) {
     return { ok: false, error: mapActionError(e) };
   }
@@ -174,14 +174,13 @@ export async function generateManualCode(formData: FormData): Promise<ActionResu
   });
   if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
 
-  const pin = generatePin();
   const { startTs, endTs } = manualValidityWindow(Date.now(), hours);
-  let keyboardPwdId: number;
+  let pin: string, keyboardPwdId: number;
   try {
-    ({ keyboardPwdId } = await createPasscode({
-      lockId: map.lockId, passcode: pin, keyboardPwdType: PERIOD_PWD_TYPE,
+    ({ pin, keyboardPwdId } = await createPasscodeWithRetry((p) => ({
+      lockId: map.lockId, passcode: p, keyboardPwdType: PERIOD_PWD_TYPE,
       startDate: startTs, endDate: endTs, name: "Manual",
-    }));
+    })));
   } catch (e) {
     return { ok: false, error: mapActionError(e) };
   }
@@ -251,12 +250,11 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
     orderBy: { createdAt: "desc" },
   });
 
-  const pin = generatePin();
-  let keyboardPwdId: number;
+  let pin: string, keyboardPwdId: number;
   try {
-    ({ keyboardPwdId } = await createPasscode({
-      lockId: map.lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
-    }));
+    ({ pin, keyboardPwdId } = await createPasscodeWithRetry((p) => ({
+      lockId: map.lockId, passcode: p, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
+    })));
   } catch (e) {
     // Log the RAW TTLock error (errcode/errmsg) so a "something went wrong" is
     // diagnosable from the Activity log — the friendly text alone hides the code.
