@@ -105,13 +105,14 @@ export function buildGuestEmail(kind: GuestEmailKind, data: GuestEmailData): { s
   }
 
   if (kind === "code_revoked") {
-    // Part 1 of the re-issue pair: the OLD code is dead; a "generated" email with
-    // the new code follows. (Distinct from "revoked", the end-of-stay thank-you.)
+    // Standalone deactivation notice (a code was revoked with no replacement).
+    // Distinct from "revoked" (the end-of-stay thank-you) and from "updated"
+    // (a rotate, which carries the new code).
     const subject = `Your door code for Room ${room} has been deactivated`;
     const inner = `<h2 style="color:${NAVY};margin:0 0 6px;font-size:22px;">${esc(name)},</h2>
       <p style="margin:0 0 12px;">The door code for ${esc(at)} has been deactivated and no longer works.</p>
-      <p style="margin:0;">A new door code is on its way — look for a separate email with your new code in a moment.</p>`;
-    const text = `${name},\n\nThe door code for ${at} has been deactivated and no longer works.\n\nA new door code is on its way — look for a separate email with your new code in a moment.\n\nQuestions? Just reply to this email.`;
+      <p style="margin:0;">If you still need access, please contact the front desk or reply to this email and we'll sort it out right away.</p>`;
+    const text = `${name},\n\nThe door code for ${at} has been deactivated and no longer works.\n\nIf you still need access, please contact the front desk or reply to this email and we'll sort it out right away.\n\nQuestions? Just reply to this email.`;
     return { subject, html: shell(inner, `Your Room ${room} door code has been deactivated.`), text };
   }
 

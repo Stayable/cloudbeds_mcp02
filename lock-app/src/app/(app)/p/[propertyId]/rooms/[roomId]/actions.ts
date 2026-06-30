@@ -47,9 +47,20 @@ export async function revokeGuestCode(propertyId: string, roomId: string): Promi
   }
   // Null activeKey so the duplicate-PIN guard frees this (reservation, room) slot.
   await prisma.passcode.update({ where: { id: code.id }, data: { status: "revoked", activeKey: null } });
+
+  // Notify the guest their code was deactivated (best-effort, no code shown). This
+  // is the safeguard for a standalone revoke (e.g. Revoke pressed instead of
+  // Rotate) — a later resend sends the "generated" email with a fresh code.
+  let emailed: { sent: boolean; reason?: string } = { sent: false, reason: "no reservation" };
+  if (code.reservationId) {
+    const map = await prisma.lockMap.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } });
+    const roomNumber = map?.roomName?.trim() || roomId;
+    emailed = await notifyGuestCode({ propertyId, reservationId: code.reservationId, roomNumber, kind: "code_revoked" });
+  }
+
   await writeAudit(user, {
     action: "guest_code_revoked", propertyId, roomId, lockId: code.lockId,
-    detail: buildDetail({ reservationId: code.reservationId ?? undefined }),
+    detail: buildDetail({ reservationId: code.reservationId ?? undefined, extra: { emailSent: emailed.sent, emailReason: emailed.reason } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true };
@@ -127,16 +138,17 @@ export async function resendGuestCode(propertyId: string, roomId: string): Promi
   const label = map.alias?.trim() || map.roomName?.trim() || roomId;
   await postReservationNote(registry, propertyId, reservationId, `${label}-${pin}`).catch(() => {});
 
-  // Email the guest in TWO parts (best-effort — never blocks the resend): first
-  // that the old code is deactivated, then the new code. Order matters for the
-  // inbox, so send sequentially.
+  // Email the guest ONE message (best-effort — never blocks the resend). If this
+  // replaced an existing code it's a rotate → "updated" (previous revoked + new
+  // code). If there was no code to replace (a generate after a standalone revoke)
+  // → "generated" (welcome/new code).
   const roomNumber = map.roomName?.trim() || roomId;
-  const revokedEmail = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "code_revoked" });
-  const generatedEmail = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: "generated", doorCode: pin });
+  const emailKind = old.length > 0 ? "updated" : "generated";
+  const emailed = await notifyGuestCode({ propertyId, reservationId, roomNumber, kind: emailKind, doorCode: pin });
 
   await writeAudit(user, {
     action: "guest_code_resent", propertyId, roomId, lockId: map.lockId,
-    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId), revokedEmailSent: revokedEmail.sent, generatedEmailSent: generatedEmail.sent, emailReason: revokedEmail.reason ?? generatedEmail.reason } }),
+    detail: buildDetail({ reservationId, extra: { keyboardPwdId: String(keyboardPwdId), emailKind, emailSent: emailed.sent, emailReason: emailed.reason } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true, data: { pin } };

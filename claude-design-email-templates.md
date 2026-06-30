@@ -66,14 +66,15 @@ Each = its own HTML email. Write **final copy**, no lorem. Show realistic sample
   your stay — please don't share it. It stops working automatically at checkout."
 - **Help:** "Code not working? Reply to this email."
 
-### C. Door code deactivated  — kind `code_revoked`  *(part 1 of the re-issue pair)*
-- **Trigger:** a guest's code is being **re-issued** (old one revoked). A separate "new code"
-  email (template B) follows immediately.
+### C. Door code deactivated  — kind `code_revoked`  *(standalone revoke — safeguard)*
+- **Trigger:** an admin **revokes** a guest's code with no replacement (e.g. Revoke pressed
+  instead of Rotate). Safeguard email so the guest knows the code stopped working.
 - **Copy:** "{{guestFirstName}}, the door code for Room {{roomNumber}} at {{propertyName}}
-  has been deactivated and no longer works. A new door code is on its way — look for a
-  separate email with your new code in a moment."
-- **No code shown.** Calm, reassuring, not alarming. Vars: `{{guestFirstName}}`,
-  `{{roomNumber}}`, `{{propertyName}}`.
+  has been deactivated and no longer works. If you still need access, please contact the
+  front desk or reply to this email and we'll sort it out right away."
+- **No code shown.** No promise of a follow-up (none is guaranteed). Calm, not alarming.
+  Vars: `{{guestFirstName}}`, `{{roomNumber}}`, `{{propertyName}}`.
+- *(After such a revoke, generating a new code sends template B — "generated".)*
 
 ### D. New door code on room change  — kind `room_changed`
 - **Trigger:** guest moved to a different room → new PIN on the new room.
@@ -82,11 +83,12 @@ Each = its own HTML email. Write **final copy**, no lorem. Show realistic sample
 - **Hero:** `{{doorCode}}`. Note: "Your previous room's code no longer works."
 - Same how-to + validity + help as B. Vars: same as B.
 
-### E. Door code updated  — kind `updated`  *(single-email re-issue variant; optional)*
-- **Note:** the live re-issue flow now uses C + B (two emails). This single combined email
-  is kept as a fallback/alt. Design it, but it's lower priority than C/B.
-- **Copy:** "Your door code for Room {{roomNumber}} has been updated. Please use the new code
-  below. Any previous code no longer works." Hero: `{{doorCode}}`.
+### E. Door code rotated/updated  — kind `updated`  *(the Rotate flow)*
+- **Trigger:** an admin **rotates** a guest's code (Resend) — the old code is revoked and a
+  new one issued in one action → ONE email.
+- **Copy:** "Your door code for Room {{roomNumber}} at {{propertyName}} has been updated.
+  Please use the new code below. Any previous code no longer works." Hero: `{{doorCode}}`.
+  Same how-to + help as B. Vars: same as B.
 
 ### F. Thank-you at checkout  — kind `revoked`
 - **Trigger:** stay ended (checkout) → code deactivated.

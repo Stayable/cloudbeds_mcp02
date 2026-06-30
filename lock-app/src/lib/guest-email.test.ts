@@ -42,12 +42,13 @@ describe("buildGuestEmail", () => {
     expect(text.toLowerCase()).toContain("deactivated");
   });
 
-  it("code_revoked: deactivation notice, no code, points to a follow-up", () => {
+  it("code_revoked: standalone deactivation notice, no code, no new-code promise", () => {
     const { subject, html, text } = buildGuestEmail("code_revoked", { ...base, doorCode: null });
     expect(subject.toLowerCase()).toContain("deactivated");
     expect(html).not.toContain("794490");
     expect(html).toContain("239");
-    expect(text.toLowerCase()).toContain("new door code is on its way");
+    expect(text.toLowerCase()).not.toContain("on its way");
+    expect(text.toLowerCase()).toContain("front desk");
   });
 
   it("falls back to 'Guest' when no first name", () => {
