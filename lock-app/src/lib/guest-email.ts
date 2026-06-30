@@ -26,9 +26,11 @@ const SERIF = "Georgia,'Times New Roman',serif";
 const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 const MONO = "'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace";
 
-// Logo is served from the lock-app public folder on its custom domain (absolute URL
-// so both apps' emails resolve it). Broken-image alt renders white on the navy bar.
-const EMAIL_LOGO_URL = "https://lock.rentstayable.com/brand/stayable-email-logo.png";
+// Logo is served from the lock-app public folder (absolute URL so both apps' emails
+// resolve it). Uses the always-live Vercel production alias so it renders even before
+// the lock.rentstayable.com custom-domain SSL is active; the .vercel.app alias stays
+// valid after the custom domain goes primary. Broken-image alt renders white on navy.
+const EMAIL_LOGO_URL = "https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png";
 
 export const GUEST_EMAIL_SENDER = "Stayable <blake@rentstayable.com>";
 export const GUEST_EMAIL_REPLY_TO = "blake@rentstayable.com";
