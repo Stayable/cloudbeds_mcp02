@@ -6,7 +6,8 @@ import { unassignedLockName } from "@/lib/lock-naming";
 import Forbidden from "@/components/Forbidden";
 import ActionButton from "@/components/ActionButton";
 import { unmapRoom } from "@/app/(app)/lock-actions";
-import { latestLockFault } from "@/lib/lock-fault";
+import { latestLockFault, lockStatusFrom, LOCK_STATUS_PILL, LOCK_STATUS_LABEL } from "@/lib/lock-fault";
+import { BACKUP_SLOTS } from "@/lib/door-detail";
 import RoomAssignForm from "./RoomAssignForm";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,10 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
 
   const name = mapped?.alias?.trim() || pooled?.name?.trim() || `${property.abbr} ${lockIdStr}`;
   const online = mapped?.online ?? pooled?.online ?? false;
-  const fault = online ? null : await latestLockFault(lockId);
+  const activeBackups = await prisma.passcode.count({ where: { lockId, type: "backup", status: "active" } });
+  const status = lockStatusFrom({ online, mapped: !!mapped, activeBackups });
+  const fault = status === "online" ? null : await latestLockFault(lockId);
+  const backupsIncomplete = !!mapped && activeBackups < BACKUP_SLOTS;
   const battery = mapped?.battery ?? pooled?.battery ?? null;
   const lastSeen = mapped?.lastSeen ?? pooled?.lastSeen ?? null;
   const battColor = battery == null ? "var(--faint)" : battery < 20 ? "var(--crit-ink)" : "var(--ink)";
@@ -50,7 +54,7 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 18 }}>
         <div className="display" style={{ fontSize: 26, fontWeight: 700, color: "var(--ink)" }}>{name}</div>
-        <span className={`pill ${online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{online ? "online" : "offline"}</span>
+        <span className={`pill ${LOCK_STATUS_PILL[status]}`}><span className="dot" />{LOCK_STATUS_LABEL[status]}</span>
         <span className={`pill ${mapped ? "pill-ok" : "pill-muted"}`}>{mapped ? `Room ${mapped.roomName?.trim() || mapped.roomId}` : "Unassigned"}</span>
       </div>
 
@@ -59,15 +63,16 @@ export default async function LockDetailPage({ params }: { params: { propertyId:
           <div className="card">
             <div className="card-title" style={{ marginBottom: 14 }}>Lock health</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-              <span className={`pill ${online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{online ? "online" : "offline"}</span>
+              <span className={`pill ${LOCK_STATUS_PILL[status]}`}><span className="dot" />{LOCK_STATUS_LABEL[status]}</span>
               {lastSeen && <span className="subtle" style={{ fontSize: 12 }}>Seen {lastSeen.toISOString().slice(0, 16).replace("T", " ")}</span>}
             </div>
-            {fault && (
-              <div style={{ background: "var(--crit-bg, #fdf0f0)", border: "1px solid var(--crit-line, #f3c9c9)", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--crit-ink)" }}>Why offline</div>
-                <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>{fault.title}.</div>
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{fault.message}</div>
-                <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>{fault.at.toISOString().slice(0, 16).replace("T", " ")} UTC · clears on the next successful action or a Sync</div>
+            {status !== "online" && (
+              <div style={{ background: status === "offline" ? "var(--crit-bg)" : "var(--warn-bg)", border: `1px solid ${status === "offline" ? "var(--crit)" : "var(--warn)"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: status === "offline" ? "var(--crit-ink)" : "var(--warn-ink)" }}>{status === "offline" ? "Why offline" : "Needs attention"}</div>
+                {backupsIncomplete && <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>Backup codes incomplete ({activeBackups}/{BACKUP_SLOTS}) — rotate the missing slots from the room page.</div>}
+                {fault && <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>{fault.title}.</div>}
+                {fault && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{fault.message}</div>}
+                {fault && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>{fault.at.toISOString().slice(0, 16).replace("T", " ")} UTC · clears on the next successful action or a Sync</div>}
               </div>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

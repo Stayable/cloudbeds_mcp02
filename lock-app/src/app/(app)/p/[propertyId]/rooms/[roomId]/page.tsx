@@ -2,12 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
-import { splitCodes, type PasscodeInput } from "@/lib/door-detail";
+import { splitCodes, BACKUP_SLOTS, type PasscodeInput } from "@/lib/door-detail";
 import { loadGuestDetails } from "@/lib/guest-loader";
 import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
-import { latestLockFault } from "@/lib/lock-fault";
+import { latestLockFault, lockStatusFrom, LOCK_STATUS_PILL, LOCK_STATUS_LABEL } from "@/lib/lock-fault";
 import Forbidden from "@/components/Forbidden";
 import AutoRefresh from "@/components/AutoRefresh";
 import ActionButton from "@/components/ActionButton";
@@ -73,7 +73,10 @@ export default async function DoorDetailPage({
   const roomNumber = resolvedNumber || roomId;
   const label = map?.alias?.trim() || roomNumber;
   const gateway = map?.gatewayId ? await prisma.gateway.findUnique({ where: { gatewayId: map.gatewayId } }) : null;
-  const lockFault = map && !map.online ? await latestLockFault(map.lockId) : null;
+  const activeBackups = backups.filter(Boolean).length;
+  const lockStatus = map ? lockStatusFrom({ online: map.online, mapped: true, activeBackups }) : null;
+  const backupsIncomplete = !!map && activeBackups < BACKUP_SLOTS;
+  const lockFault = map && lockStatus !== "online" ? await latestLockFault(map.lockId) : null;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -88,7 +91,7 @@ export default async function DoorDetailPage({
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 18 }}>
         <div className="display tnum" style={{ fontSize: 28, fontWeight: 700, color: "var(--ink)", letterSpacing: "-.01em" }}>{label}</div>
         <span className={`pill ${state?.guestName ? "pill-warn" : "pill-muted"}`}>{state?.guestName ? "Occupied" : "Vacant"}</span>
-        {map && <span className={`pill ${map.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{map.online ? "online" : "offline"}</span>}
+        {map && lockStatus && <span className={`pill ${LOCK_STATUS_PILL[lockStatus]}`}><span className="dot" />{LOCK_STATUS_LABEL[lockStatus]}</span>}
         <div style={{ flex: 1 }} />
         {state?.guestName && (
           <div style={{ textAlign: "right" }}><div className="eyebrow">GUEST</div><div style={{ fontWeight: 600, fontSize: 14, marginTop: 3 }}>{state.guestName}{state.checkoutDate ? ` · out ${state.checkoutDate}` : ""}</div></div>
@@ -225,15 +228,16 @@ export default async function DoorDetailPage({
             {map ? (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                  <span className={`pill ${map.online ? "pill-ok" : "pill-crit"}`}><span className="dot" />{map.online ? "online" : "offline"}</span>
+                  {lockStatus && <span className={`pill ${LOCK_STATUS_PILL[lockStatus]}`}><span className="dot" />{LOCK_STATUS_LABEL[lockStatus]}</span>}
                   {map.lastSeen && <span className="subtle" style={{ fontSize: 12 }}>Seen {map.lastSeen.toISOString().slice(0, 16).replace("T", " ")}</span>}
                 </div>
-                {lockFault && (
-                  <div style={{ background: "var(--crit-bg, #fdf0f0)", border: "1px solid var(--crit-line, #f3c9c9)", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--crit-ink)" }}>Why offline</div>
-                    <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>{lockFault.title}.</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{lockFault.message}</div>
-                    <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>{lockFault.at.toISOString().slice(0, 16).replace("T", " ")} UTC · clears on the next successful action or a Sync</div>
+                {lockStatus && lockStatus !== "online" && (
+                  <div style={{ background: lockStatus === "offline" ? "var(--crit-bg)" : "var(--warn-bg)", border: `1px solid ${lockStatus === "offline" ? "var(--crit)" : "var(--warn)"}`, borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: lockStatus === "offline" ? "var(--crit-ink)" : "var(--warn-ink)" }}>{lockStatus === "offline" ? "Why offline" : "Needs attention"}</div>
+                    {backupsIncomplete && <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>Backup codes incomplete ({activeBackups}/{BACKUP_SLOTS}) — rotate the missing slots below.</div>}
+                    {lockFault && <div style={{ fontSize: 13, color: "var(--ink)", marginTop: 4 }}>{lockFault.title}.</div>}
+                    {lockFault && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{lockFault.message}</div>}
+                    {lockFault && <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 6 }}>{lockFault.at.toISOString().slice(0, 16).replace("T", " ")} UTC · clears on the next successful action or a Sync</div>}
                   </div>
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
