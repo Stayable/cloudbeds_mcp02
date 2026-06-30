@@ -128,6 +128,16 @@ function generatePin(): string {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
+ * True ONLY for a permanently-unreachable lock (TTLock -2012 / "not connected to a
+ * gateway") — won't recover on a retry. Transient errors (errcode 3003 "gateway is
+ * busy", errcode 1 "failed") return false so we RETRY them. Must NOT match the bare
+ * word "gateway" or "gateway is busy" would be wrongly treated as offline.
+ */
+function isUnreachableLockError(msg: string): boolean {
+  return /-2012|not connected|no gateway/i.test(msg);
+}
+
+/**
  * Convert a Cloudbeds date range (YYYY-MM-DD) into a TTLock validity window in
  * epoch-ms. We open the code at the start of the arrival day and expire it at
  * the end of the departure day (UTC). Florida is UTC-4/5, so this is generous
@@ -337,7 +347,7 @@ async function createPasscodeForRoom(
         });
       } catch (err: any) {
         const msg = err?.message ?? String(err);
-        const offline = /gateway|not connected|-2012/i.test(msg);
+        const offline = isUnreachableLockError(msg);
         if (offline) {
           await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
         }
@@ -377,7 +387,7 @@ async function createPasscodeForRoom(
         break;
       } catch (e: any) {
         const m = e?.message ?? String(e);
-        if (attempt >= 2 || /-2012|not connected|gateway/i.test(m)) throw e;
+        if (attempt >= 2 || isUnreachableLockError(m)) throw e;
         await sleep(2000);
         pin = generatePin();
       }
@@ -475,8 +485,9 @@ async function createPasscodeForRoom(
       return;
     }
     const msg = err?.message ?? String(err);
-    // A gateway/connectivity failure (TTLock -2012) means the lock is unreachable.
-    const offline = /gateway|not connected|-2012/i.test(msg);
+    // Unreachable lock (TTLock -2012) vs transient (3003 busy / 1 failed): only the
+    // former is "offline" — transient errors were already retried above.
+    const offline = isUnreachableLockError(msg);
     const label = map.alias?.trim() || roomNameFor(detail, roomId) || roomId;
 
     if (offline) {

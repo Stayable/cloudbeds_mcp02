@@ -113,7 +113,7 @@ export default async function DoorDetailPage({
                 <div className="pin-block">
                   <div className="pin-value">
                     {can("guest_code.reveal")
-                      ? <RevealButton label={`Reveal ${guest.maskedPin}`} action={async () => { "use server"; return revealGuestCode(propertyId, roomId); }} />
+                      ? <RevealButton key={guest.keyboardPwdId} label={`Reveal ${guest.maskedPin}`} action={async () => { "use server"; return revealGuestCode(propertyId, roomId); }} />
                       : guest.maskedPin}
                   </div>
                 </div>
@@ -175,7 +175,7 @@ export default async function DoorDetailPage({
                     <div className="mono" style={{ flex: 1, fontSize: 18, color: b ? "var(--ink)" : "var(--faint)" }}>
                       {b
                         ? (can("backup_code.reveal")
-                            ? <RevealButton variant="onLight" label={`Reveal ${b.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId, slot); }} />
+                            ? <RevealButton key={b.keyboardPwdId} variant="onLight" label={`Reveal ${b.maskedPin}`} action={async () => { "use server"; return revealBackupCode(propertyId, roomId, slot); }} />
                             : b.maskedPin)
                         : "Not set"}
                     </div>

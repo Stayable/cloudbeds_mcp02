@@ -11,7 +11,7 @@ import { CloudbedsRegistry, getReservation, postReservationNote } from "@/lib/cl
 import { detectDrift } from "@/lib/reconcile";
 import { buildDetail } from "@/lib/audit";
 import { writeAudit } from "@/lib/audit-write";
-import { mapActionError, type ActionResult } from "@/lib/action-result";
+import { mapActionError, isUnreachableLockError, type ActionResult } from "@/lib/action-result";
 import { notifyGuestCode } from "@/lib/guest-notify";
 
 function detailPath(propertyId: string, roomId: string): string {
@@ -245,7 +245,9 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
   });
   if (!map) return { ok: false, error: "This room isn’t mapped to a lock yet." };
 
-  const old = await prisma.passcode.findFirst({
+  // ALL active codes in this slot (normally 0–1, but a prior partial/dup could
+  // leave more) — we revoke every one so a rotate can't leave two active per slot.
+  const olds = await prisma.passcode.findMany({
     where: { propertyId, roomId, type: "backup", status: "active", ...backupSlotWhere(slot) },
     orderBy: { createdAt: "desc" },
   });
@@ -259,7 +261,7 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
     // Log the RAW TTLock error (errcode/errmsg) so a "something went wrong" is
     // diagnosable from the Activity log — the friendly text alone hides the code.
     const raw = e instanceof Error ? e.message : String(e);
-    const offline = /-2012|not connected|gateway/i.test(raw);
+    const offline = isUnreachableLockError(e);
     if (offline) await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
     await writeAudit(user, {
       action: "backup_code_rotate_failed", propertyId, roomId, lockId: map.lockId,
@@ -276,17 +278,18 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
   });
   // The lock just accepted a write → it's reachable. Clear any stale offline flag.
   await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
-  if (old) {
-    // Best-effort delete of the previous code; the new one is already live, so a
-    // failure here must not surface as an error (it would imply rotation failed).
+  // Best-effort delete of EVERY previous code in this slot; the new one is already
+  // live, so a delete failure must not surface as an error. Revoking all of them
+  // collapses any pre-existing duplicate slot rows down to the single new code.
+  for (const old of olds) {
     try {
       await deletePasscode({ lockId: old.lockId, keyboardPwdId: old.keyboardPwdId });
-    } catch { /* leave old row active-untracked; sync-from-lock will surface drift */ }
+    } catch { /* leave physical drift; sync-from-lock surfaces it */ }
     await prisma.passcode.update({ where: { id: old.id }, data: { status: "revoked" } });
   }
   await writeAudit(user, {
     action: "backup_code_rotated", propertyId, roomId, lockId: map.lockId,
-    detail: buildDetail({ beforePin: old?.pin, afterPin: pin, extra: { slot } }),
+    detail: buildDetail({ beforePin: olds[0]?.pin, afterPin: pin, extra: { slot } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true };

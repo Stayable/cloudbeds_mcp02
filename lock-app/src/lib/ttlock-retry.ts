@@ -1,5 +1,6 @@
 import { createPasscode, type CreatePasscodeArgs } from "./ttlock";
 import { generatePin } from "./passcodes";
+import { isUnreachableLockError } from "./action-result";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -23,8 +24,9 @@ export async function createPasscodeWithRetry(
       const { keyboardPwdId } = await createPasscode(makeArgs(pin));
       return { pin, keyboardPwdId };
     } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      if (i >= attempts - 1 || /-2012|not connected|gateway/i.test(m)) throw e;
+      // Bail only on a truly-unreachable lock; retry transient failures (errcode
+      // 3003 "gateway is busy", errcode 1 "failed") with a fresh PIN + backoff.
+      if (i >= attempts - 1 || isUnreachableLockError(e)) throw e;
       await sleep(backoffMs);
       pin = generatePin();
     }
