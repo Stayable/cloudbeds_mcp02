@@ -4,6 +4,12 @@
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
 RESUME HERE (2026-07-01 latest) — **All shipped + pushed (branch tip ce3c008; lock-app 175 + middleware 42 tests green, both build).** Auto-deploys live.
+SECURITY REVIEW (2026-07-01): ran /security-review over this session's changes (emails, server actions, cron
+  route, middleware passcode logic, getGuest). **No HIGH/MEDIUM findings.** Verified: email XSS (all guest fields
+  esc()'d, no dangerouslySetInnerHTML), no email header injection (Resend JSON API not SMTP), server actions all
+  gate requirePermission scoped to propertyId (no escalation), cron/webhook auth fail-closed, PINs use
+  crypto.randomInt, no secret/PII leakage, Prisma typed queries (no raw SQL). Minor: unused `at` var in
+  buildGuestEmail (dead code, harmless).
 NEWEST (2026-07-01, after the room-transfer fix below):
   • ⭐ TTLock errcode 3003 "gateway is busy" was misread as OFFLINE (the retry/offline checks matched the bare
     word "gateway") → no retry, room marked red, create abandoned. THIS caused BK's transfer mess (destination red
