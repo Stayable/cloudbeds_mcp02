@@ -39,22 +39,41 @@ export interface AccessRow {
   success: boolean;
 }
 
-// TTLock recordType → friendly method, for NON-passcode unlocks (a keypad entry is
-// labelled "Keypad code" directly). Numbers are best-known; unknowns fall back.
+// TTLock recordType → friendly method label. Authoritative values from the TTLock
+// docs (euopen.ttlock.com /doc/api/v3/lockRecord/list). Unknown types fall back to
+// "Method <n>" rather than fabricating a meaning.
 const METHOD_BY_TYPE: Record<number, string> = {
-  1: "App / Bluetooth",
+  1: "App",
+  2: "Parking lock touch",
+  3: "Gateway (remote)",
   4: "Keypad code",
+  5: "Parking lock raise",
+  6: "Parking lock lower",
   7: "IC card",
   8: "Fingerprint",
-  9: "Keypad code",
-  46: "Auto-lock",
-  47: "Manual (thumb-turn)",
+  9: "Wristband",
+  10: "Mechanical key",
+  11: "Bluetooth",
+  12: "Gateway (remote)",
+  29: "Unexpected unlock",
+  30: "Door sensor: closed",
+  31: "Door sensor: open",
+  32: "Opened from inside",
+  33: "Locked (fingerprint)",
+  34: "Locked (keypad code)",
+  35: "Locked (IC card)",
+  36: "Locked (mechanical key)",
+  37: "Remote control",
+  44: "Tamper alert",
+  45: "Auto-lock",
+  46: "Unlock key",
+  47: "Lock key",
+  48: "Too many invalid codes",
 };
 
-function methodLabel(rec: LockRecordInput, isKeypad: boolean): string {
-  if (isKeypad) return "Keypad code";
-  if (rec.recordType != null && METHOD_BY_TYPE[rec.recordType]) return METHOD_BY_TYPE[rec.recordType];
-  return rec.recordType != null ? `Method ${rec.recordType}` : "Unknown";
+function methodLabel(recordType?: number): string {
+  if (recordType != null && METHOD_BY_TYPE[recordType]) return METHOD_BY_TYPE[recordType];
+  return recordType != null ? `Method ${recordType}` : "Unknown";
 }
 
 function findPasscode(rec: LockRecordInput, passcodes: AccessPasscode[]): AccessPasscode | undefined {
@@ -79,18 +98,44 @@ function labelFor(p: AccessPasscode, abbr: string): { label: string; credential:
 }
 
 export function classifyAccessRecord(rec: LockRecordInput, passcodes: AccessPasscode[], abbr: string): AccessRow {
-  const isKeypad = !!rec.keyboardPwd || rec.recordType === 4 || rec.recordType === 9;
+  const method = methodLabel(rec.recordType);
   const success = rec.success === 1;
-  const match = isKeypad ? findPasscode(rec, passcodes) : undefined;
-  const { label, credential } = match
-    ? labelFor(match, abbr)
-    : isKeypad
-      ? { label: "Other / unknown code", credential: "other" as const }
-      : { label: methodLabel(rec, false), credential: "other" as const };
-  return { at: rec.lockDate, method: methodLabel(rec, isKeypad), label, credential, success };
+  // A code was involved when the record carries the entered PIN or a keyboardPwdId.
+  const hasCode = !!rec.keyboardPwd || rec.keyboardPwdId != null;
+  const match = hasCode ? findPasscode(rec, passcodes) : undefined;
+  let label: string;
+  let credential: AccessCredential;
+  if (match) {
+    ({ label, credential } = labelFor(match, abbr));
+  } else if (rec.keyboardPwd) {
+    label = "Other / unknown code"; // a PIN we never issued (or since deleted)
+    credential = "other";
+  } else {
+    label = method; // non-code event (mechanical key, app, sensor, …)
+    credential = "other";
+  }
+  return { at: rec.lockDate, method, label, credential, success };
 }
 
 /** Classify a batch of records, newest-first. */
 export function buildAccessRows(recs: LockRecordInput[], passcodes: AccessPasscode[], abbr: string): AccessRow[] {
   return recs.map((r) => classifyAccessRecord(r, passcodes, abbr)).sort((a, b) => b.at - a.at);
+}
+
+const CSV_HEADERS = ["Time (local)", "Time (UTC)", "Who / code", "Type", "Method", "Result"];
+
+function csvCell(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+/** Serialize access rows to CSV. Local time is formatted in the property timezone. */
+export function accessRowsToCsv(rows: AccessRow[], timeZone: string): string {
+  const local = (ms: number) =>
+    new Intl.DateTimeFormat("en-US", {
+      timeZone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    }).format(new Date(ms));
+  const body = rows
+    .map((r) => [local(r.at), new Date(r.at).toISOString(), r.label, r.credential, r.method, r.success ? "success" : "failed"].map(csvCell).join(","))
+    .join("\n");
+  return `${CSV_HEADERS.join(",")}\n${body}\n`;
 }

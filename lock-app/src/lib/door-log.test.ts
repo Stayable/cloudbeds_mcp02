@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyAccessRecord, buildAccessRows, type AccessPasscode, type LockRecordInput } from "./door-log";
+import { classifyAccessRecord, buildAccessRows, accessRowsToCsv, type AccessPasscode, type LockRecordInput } from "./door-log";
 
 const passcodes: AccessPasscode[] = [
   { keyboardPwdId: "11", pin: "4821", type: "guest", reservationId: "R1", backupSlot: null, label: null },
@@ -40,7 +40,15 @@ describe("classifyAccessRecord", () => {
   });
   it("labels a non-passcode unlock by its method", () => {
     const r = classifyAccessRecord(rec({ recordType: 1, keyboardPwd: null }), passcodes, ABBR);
-    expect(r).toMatchObject({ credential: "other", method: "App / Bluetooth" });
+    expect(r).toMatchObject({ credential: "other", label: "App", method: "App" });
+  });
+  it("labels a mechanical-key unlock (recordType 10)", () => {
+    const r = classifyAccessRecord(rec({ recordType: 10, keyboardPwd: null }), passcodes, ABBR);
+    expect(r).toMatchObject({ credential: "other", label: "Mechanical key", method: "Mechanical key" });
+  });
+  it("falls back to 'Method <n>' for an unmapped recordType", () => {
+    const r = classifyAccessRecord(rec({ recordType: 99, keyboardPwd: null }), passcodes, ABBR);
+    expect(r.method).toBe("Method 99");
   });
   it("flags a failed attempt", () => {
     const r = classifyAccessRecord(rec({ keyboardPwd: "1234", success: 0 }), passcodes, ABBR);
@@ -55,5 +63,23 @@ describe("buildAccessRows", () => {
       passcodes, ABBR,
     );
     expect(rows.map((r) => r.at)).toEqual([300, 200, 100]);
+  });
+});
+
+describe("accessRowsToCsv", () => {
+  it("emits a header and one line per row, with the credential + result", () => {
+    const rows = buildAccessRows([rec({ keyboardPwd: "4821" }), rec({ recordType: 10, keyboardPwd: null, success: 0 })], passcodes, ABBR);
+    const csv = accessRowsToCsv(rows, "America/New_York");
+    const lines = csv.trim().split("\n");
+    expect(lines[0]).toBe("Time (local),Time (UTC),Who / code,Type,Method,Result");
+    expect(lines).toHaveLength(3); // header + 2 rows
+    expect(csv).toContain("Guest (Res R1)");
+    expect(csv).toContain("guest");
+    expect(csv).toContain("failed");
+  });
+  it("quotes a value containing a comma", () => {
+    const custom: AccessPasscode[] = [{ keyboardPwdId: "20", pin: "1212", type: "backup", reservationId: null, backupSlot: 1, label: "Front Desk, AM" }];
+    const rows = buildAccessRows([rec({ keyboardPwd: "1212" })], custom, "LL");
+    expect(accessRowsToCsv(rows, "America/New_York")).toContain('"LL-Front Desk, AM"');
   });
 });

@@ -5,6 +5,8 @@ import { getProperty } from "@/lib/properties";
 import { splitCodes, BACKUP_SLOTS, type PasscodeInput } from "@/lib/door-detail";
 import { loadGuestDetails } from "@/lib/guest-loader";
 import { loadAccessRows } from "@/lib/lock-record-loader";
+import { accessRowsToCsv } from "@/lib/door-log";
+import ExportCsvButton from "@/components/ExportCsvButton";
 import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
@@ -30,12 +32,23 @@ function fmtAccessTime(ms: number, timeZone: string): string {
   }).format(new Date(ms));
 }
 
+/** Parse the access-log date-range filter (YYYY-MM-DD) into an epoch-ms window.
+ *  Undefined bounds let ttlock.listLockRecords apply its default (last 14 days). */
+function accessWindow(start?: string, end?: string): { startDate?: number; endDate?: number } {
+  const s = start ? Date.parse(`${start}T00:00:00`) : NaN;
+  const e = end ? Date.parse(`${end}T23:59:59`) : NaN;
+  return {
+    startDate: Number.isNaN(s) ? undefined : s,
+    endDate: Number.isNaN(e) ? undefined : e,
+  };
+}
+
 export default async function DoorDetailPage({
   params,
   searchParams,
 }: {
   params: { propertyId: string; roomId: string };
-  searchParams?: { from?: string };
+  searchParams?: { from?: string; start?: string; end?: string };
 }) {
   const { propertyId, roomId } = params;
   // Back-link target: returning to where you came from. From the Dashboard's
@@ -99,8 +112,10 @@ export default async function DoorDetailPage({
             reservationId: c.reservationId, backupSlot: c.backupSlot, label: c.label,
           })),
           property.abbr,
+          accessWindow(searchParams?.start, searchParams?.end),
         )
       : undefined;
+  const accessCsv = accessRows && accessRows.length ? accessRowsToCsv(accessRows, property.timezone) : null;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -228,10 +243,30 @@ export default async function DoorDetailPage({
 
           {map && can("activity.view") && (
             <div className="card">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
                 <span className="card-title">Recent access</span>
-                <span className="chip">last 14 days</span>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                  <form method="get" style={{ display: "flex", alignItems: "flex-end", gap: 6, flexWrap: "wrap" }}>
+                    {searchParams?.from && <input type="hidden" name="from" value={searchParams.from} />}
+                    <label style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 2 }}>FROM
+                      <input type="date" name="start" defaultValue={searchParams?.start ?? ""} className="field" style={{ height: 34 }} />
+                    </label>
+                    <label style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 2 }}>TO
+                      <input type="date" name="end" defaultValue={searchParams?.end ?? ""} className="field" style={{ height: 34 }} />
+                    </label>
+                    <button type="submit" className="btn btn-navy" style={{ height: 34 }}>Filter</button>
+                    {(searchParams?.start || searchParams?.end) && (
+                      <Link href={`/p/${propertyId}/rooms/${roomId}${searchParams?.from ? `?from=${searchParams.from}` : ""}`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)", height: 34, display: "inline-flex", alignItems: "center" }}>Clear</Link>
+                    )}
+                  </form>
+                  {accessCsv && <ExportCsvButton csv={accessCsv} filename={`access_${propertyId}_${roomNumber}.csv`} />}
+                </div>
               </div>
+              <p className="subtle" style={{ fontSize: 11, marginTop: -6, marginBottom: 12 }}>
+                {searchParams?.start || searchParams?.end
+                  ? `Showing ${searchParams?.start || "earliest"} → ${searchParams?.end || "now"}`
+                  : "Showing the last 14 days"}
+              </p>
               {accessRows == null ? (
                 <p className="subtle">Access history unavailable.</p>
               ) : accessRows.length === 0 ? (

@@ -5,18 +5,19 @@
  * endpoint) so the page degrades to "unavailable" instead of crashing, mirroring
  * the guest-details loader. Returns [] when the lock simply has no recent activity.
  */
-import { listLockRecords } from "./ttlock";
+import { listLockRecords, type ListLockRecordsOpts } from "./ttlock";
 import { buildAccessRows, type AccessRow, type AccessPasscode } from "./door-log";
 
-const MAX_ROWS = 50;
+const MAX_ROWS = 200;
 
 export async function loadAccessRows(
   lockId: bigint,
   passcodes: AccessPasscode[],
   abbr: string,
+  window: Pick<ListLockRecordsOpts, "startDate" | "endDate"> = {},
 ): Promise<AccessRow[] | null> {
   try {
-    const { list } = await listLockRecords(lockId);
+    const { list } = await listLockRecords(lockId, { ...window, pageSize: 100 });
     return buildAccessRows(list, passcodes, abbr).slice(0, MAX_ROWS);
   } catch {
     return null;
