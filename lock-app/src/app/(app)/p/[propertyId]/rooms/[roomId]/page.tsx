@@ -6,6 +6,7 @@ import { splitCodes, BACKUP_SLOTS, type PasscodeInput } from "@/lib/door-detail"
 import { loadGuestDetails } from "@/lib/guest-loader";
 import { loadAccessRows } from "@/lib/lock-record-loader";
 import { accessRowsToCsv } from "@/lib/door-log";
+import { roomCodePrefix } from "@/lib/code-naming";
 import ExportCsvButton from "@/components/ExportCsvButton";
 import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
@@ -93,6 +94,8 @@ export default async function DoorDetailPage({
       : Promise.resolve([]),
   ]);
   const roomNumber = resolvedNumber || roomId;
+  // Recognizable code prefix, e.g. "LL231" → codes read "LL231-Maintenance".
+  const codePrefix = roomCodePrefix(property.abbr, map?.roomName?.trim() || (resolvedNumber ?? null));
   const label = map?.alias?.trim() || roomNumber;
   const gateway = map?.gatewayId ? await prisma.gateway.findUnique({ where: { gatewayId: map.gatewayId } }) : null;
   const activeBackups = backups.filter(Boolean).length;
@@ -111,7 +114,7 @@ export default async function DoorDetailPage({
             keyboardPwdId: String(c.keyboardPwdId), pin: c.pin, type: c.type,
             reservationId: c.reservationId, backupSlot: c.backupSlot, label: c.label,
           })),
-          property.abbr,
+          codePrefix,
           accessWindow(searchParams?.start, searchParams?.end),
         )
       : undefined;
@@ -212,7 +215,7 @@ export default async function DoorDetailPage({
                   <div key={slot} style={{ display: "flex", alignItems: "center", gap: 12, borderTop: i > 0 ? "1px solid var(--divider)" : undefined, paddingTop: i > 0 ? 10 : 0 }}>
                     <span style={{ width: 150, position: "relative" }}>
                       <BackupNameEditor
-                        abbr={property.abbr}
+                        prefix={codePrefix}
                         slot={slot}
                         label={b?.label ?? null}
                         canEdit={can("backup_code.rotate") && !!map && !!b}

@@ -85,19 +85,19 @@ function findPasscode(rec: LockRecordInput, passcodes: AccessPasscode[]): Access
   return undefined;
 }
 
-function labelFor(p: AccessPasscode, abbr: string): { label: string; credential: AccessCredential } {
+function labelFor(p: AccessPasscode, prefix: string): { label: string; credential: AccessCredential } {
   if (p.type === "guest") {
     return { credential: "guest", label: p.reservationId ? `Guest (Res ${p.reservationId})` : "Guest code" };
   }
   if (p.type === "backup") {
     const slot = p.backupSlot ?? 1;
-    return { credential: "backup", label: fullCodeName(abbr, backupCodeLabel(slot, p.label)) };
+    return { credential: "backup", label: fullCodeName(prefix, backupCodeLabel(slot, p.label)) };
   }
   if (p.type === "manual") return { credential: "manual", label: "Manual code" };
   return { credential: "other", label: "Other / unknown code" };
 }
 
-export function classifyAccessRecord(rec: LockRecordInput, passcodes: AccessPasscode[], abbr: string): AccessRow {
+export function classifyAccessRecord(rec: LockRecordInput, passcodes: AccessPasscode[], prefix: string): AccessRow {
   const method = methodLabel(rec.recordType);
   const success = rec.success === 1;
   // A code was involved when the record carries the entered PIN or a keyboardPwdId.
@@ -106,7 +106,7 @@ export function classifyAccessRecord(rec: LockRecordInput, passcodes: AccessPass
   let label: string;
   let credential: AccessCredential;
   if (match) {
-    ({ label, credential } = labelFor(match, abbr));
+    ({ label, credential } = labelFor(match, prefix));
   } else if (rec.keyboardPwd) {
     label = "Other / unknown code"; // a PIN we never issued (or since deleted)
     credential = "other";
@@ -118,8 +118,8 @@ export function classifyAccessRecord(rec: LockRecordInput, passcodes: AccessPass
 }
 
 /** Classify a batch of records, newest-first. */
-export function buildAccessRows(recs: LockRecordInput[], passcodes: AccessPasscode[], abbr: string): AccessRow[] {
-  return recs.map((r) => classifyAccessRecord(r, passcodes, abbr)).sort((a, b) => b.at - a.at);
+export function buildAccessRows(recs: LockRecordInput[], passcodes: AccessPasscode[], prefix: string): AccessRow[] {
+  return recs.map((r) => classifyAccessRecord(r, passcodes, prefix)).sort((a, b) => b.at - a.at);
 }
 
 const CSV_HEADERS = ["Time (local)", "Time (UTC)", "Who / code", "Type", "Method", "Result"];

@@ -6,16 +6,17 @@ import ActionError from "@/components/ActionError";
 import { backupCodeLabel, fullCodeName, MAX_LABEL_LEN } from "@/lib/code-naming";
 
 /**
- * Shows a backup slot's name as `<ABBR>-<label>` (e.g. "LL-Maintenance") with a
- * pencil to rename it. Editing reveals an inline field where staff type only the
- * descriptive part — the fixed `<ABBR>-` prefix is shown alongside. Clearing the
- * field resets the slot to the default "Backup {slot}". Read-only (no pencil)
- * when the caller lacks permission or the slot has no code yet.
+ * Shows a backup slot's name as `<prefix>-<label>` (e.g. "LL231-Maintenance") with
+ * a pencil to rename it. Editing reveals an inline field where staff type only the
+ * descriptive part — the fixed `<prefix>-` (property + room) is shown alongside.
+ * Clearing the field resets the slot to the default "Backup {slot}". Read-only (no
+ * pencil) when the caller lacks permission or the slot has no code yet.
  */
 export default function BackupNameEditor({
-  abbr, slot, label, canEdit, action,
+  prefix, slot, label, canEdit, action,
 }: {
-  abbr: string;
+  /** Recognizable code prefix, e.g. "LL231" (<ABBR><roomNumber>). */
+  prefix: string;
   slot: number;
   /** Custom label part, or null for the default "Backup {slot}". */
   label: string | null;
@@ -28,7 +29,7 @@ export default function BackupNameEditor({
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  const display = fullCodeName(abbr, backupCodeLabel(slot, label));
+  const display = fullCodeName(prefix, backupCodeLabel(slot, label));
 
   if (!editing) {
     return (
@@ -70,7 +71,7 @@ export default function BackupNameEditor({
         padding: "6px 8px", boxShadow: "0 6px 20px rgba(16,24,40,.14)",
       }}
     >
-      {abbr && <span className="mono" style={{ fontSize: 13, color: "var(--faint)" }}>{abbr}-</span>}
+      {prefix && <span className="mono" style={{ fontSize: 13, color: "var(--faint)" }}>{prefix}-</span>}
       <input
         autoFocus
         value={value}

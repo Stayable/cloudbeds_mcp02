@@ -74,7 +74,7 @@ export async function assignLockToRoom(formData: FormData): Promise<ActionResult
   //   1..N-1     → reachable but some writes failed → keep ONLINE, log a partial.
   //   N created  → all good (also clears any stale offline flag).
   await revokeAllCodesForLock(lockId);
-  const gen = await generateBackupCodesForRoom({ propertyId, roomId, lockId });
+  const gen = await generateBackupCodesForRoom({ propertyId, roomId, lockId, roomName: roomNumber });
   let backupNote: string;
   if (gen.created === 0) {
     await prisma.lockMap.updateMany({ where: { lockId }, data: { online: false } });

@@ -13,12 +13,12 @@ const MAX_ROWS = 200;
 export async function loadAccessRows(
   lockId: bigint,
   passcodes: AccessPasscode[],
-  abbr: string,
+  prefix: string,
   window: Pick<ListLockRecordsOpts, "startDate" | "endDate"> = {},
 ): Promise<AccessRow[] | null> {
   try {
     const { list } = await listLockRecords(lockId, { ...window, pageSize: 100 });
-    return buildAccessRows(list, passcodes, abbr).slice(0, MAX_ROWS);
+    return buildAccessRows(list, passcodes, prefix).slice(0, MAX_ROWS);
   } catch {
     return null;
   }

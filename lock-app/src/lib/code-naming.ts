@@ -15,9 +15,21 @@ export function backupCodeLabel(slot: number, custom?: string | null): string {
   return c ? c : `Backup ${slot}`;
 }
 
-/** Full display / TTLock name: `<ABBR>-<label>`. Abbr omitted when blank. */
-export function fullCodeName(abbr: string, label: string): string {
-  return abbr ? `${abbr}-${label}` : label;
+/** Full display / TTLock name: `<prefix>-<label>`. Prefix omitted when blank. */
+export function fullCodeName(prefix: string, label: string): string {
+  return prefix ? `${prefix}-${label}` : label;
+}
+
+/**
+ * The recognizable prefix for a room's codes: `<ABBR><roomNumber>` (e.g. "LL231"),
+ * so a code reads "LL231-Maintenance" — property + room + purpose at a glance.
+ * Falls back to just `<ABBR>` when the room number is unknown, and to "" when even
+ * the abbr is blank.
+ */
+export function roomCodePrefix(abbr: string, roomNumber?: string | null): string {
+  const n = roomNumber?.trim();
+  if (!abbr) return "";
+  return n ? `${abbr}${n}` : abbr;
 }
 
 /**

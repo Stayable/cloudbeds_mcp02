@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { backupCodeLabel, fullCodeName, sanitizeLabel, MAX_LABEL_LEN } from "./code-naming";
+import { backupCodeLabel, fullCodeName, roomCodePrefix, sanitizeLabel, MAX_LABEL_LEN } from "./code-naming";
 
 describe("backupCodeLabel", () => {
   it("defaults to 'Backup N' when there's no custom label", () => {
@@ -19,6 +19,20 @@ describe("fullCodeName", () => {
   });
   it("omits the prefix when abbr is blank", () => {
     expect(fullCodeName("", "Maintenance")).toBe("Maintenance");
+  });
+});
+
+describe("roomCodePrefix", () => {
+  it("joins abbr + room number", () => {
+    expect(roomCodePrefix("LL", "231")).toBe("LL231");
+    expect(fullCodeName(roomCodePrefix("LL", "231"), "Maintenance")).toBe("LL231-Maintenance");
+  });
+  it("falls back to just the abbr when the room number is unknown", () => {
+    expect(roomCodePrefix("LL", null)).toBe("LL");
+    expect(roomCodePrefix("LL", "  ")).toBe("LL");
+  });
+  it("is blank when the abbr is blank", () => {
+    expect(roomCodePrefix("", "231")).toBe("");
   });
 });
 

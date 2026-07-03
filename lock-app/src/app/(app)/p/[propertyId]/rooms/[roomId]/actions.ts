@@ -7,7 +7,7 @@ import { deletePasscode, listPasscodes, renamePasscode } from "@/lib/ttlock";
 import { createPasscodeWithRetry } from "@/lib/ttlock-retry";
 import { manualValidityWindow, guestValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
 import { BACKUP_SLOTS } from "@/lib/door-detail";
-import { backupCodeLabel, fullCodeName, sanitizeLabel } from "@/lib/code-naming";
+import { backupCodeLabel, fullCodeName, roomCodePrefix, sanitizeLabel } from "@/lib/code-naming";
 import { getProperty } from "@/lib/properties";
 import { CloudbedsRegistry, getReservation, postReservationNote } from "@/lib/cloudbeds";
 import { detectDrift } from "@/lib/reconcile";
@@ -257,8 +257,8 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
   // Carry the slot's custom label across the rotate (the label names the slot's
   // purpose, not the digits). Falls back to the default "Backup {slot}".
   const carriedLabel = olds[0]?.label ?? null;
-  const abbr = getProperty(propertyId)?.abbr ?? "";
-  const codeName = fullCodeName(abbr, backupCodeLabel(slot, carriedLabel));
+  const prefix = roomCodePrefix(getProperty(propertyId)?.abbr ?? "", map.roomName);
+  const codeName = fullCodeName(prefix, backupCodeLabel(slot, carriedLabel));
 
   let pin: string, keyboardPwdId: number;
   try {
@@ -319,10 +319,11 @@ export async function renameBackupCode(propertyId: string, roomId: string, slot:
   });
   if (!code) return { ok: false, error: `No backup code in slot ${slot} yet — create one before naming it.` };
 
+  const map = await prisma.lockMap.findUnique({ where: { propertyId_roomId: { propertyId, roomId } } });
   const clean = sanitizeLabel(rawLabel ?? "");
   const label = clean || null; // "" → reset to default label
-  const abbr = getProperty(propertyId)?.abbr ?? "";
-  const codeName = fullCodeName(abbr, backupCodeLabel(slot, label));
+  const prefix = roomCodePrefix(getProperty(propertyId)?.abbr ?? "", map?.roomName);
+  const codeName = fullCodeName(prefix, backupCodeLabel(slot, label));
 
   try {
     await renamePasscode({ lockId: code.lockId, keyboardPwdId: code.keyboardPwdId, name: codeName });
