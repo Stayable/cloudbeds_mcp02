@@ -4,6 +4,7 @@ import { requireUserOrRedirect, sessionCan } from "@/lib/session-access";
 import { getProperty } from "@/lib/properties";
 import { splitCodes, BACKUP_SLOTS, type PasscodeInput } from "@/lib/door-detail";
 import { loadGuestDetails } from "@/lib/guest-loader";
+import { loadAccessRows } from "@/lib/lock-record-loader";
 import { unassignedLockName } from "@/lib/lock-naming";
 import { CloudbedsRegistry } from "@/lib/cloudbeds";
 import { loadRoomIndex, resolveNameFromId } from "@/lib/room-resolver";
@@ -21,6 +22,13 @@ import {
 import { assignLockToRoom, unmapRoom } from "@/app/(app)/lock-actions";
 
 export const dynamic = "force-dynamic";
+
+/** Format an unlock timestamp in the property's local (Florida/Eastern) time. */
+function fmtAccessTime(ms: number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  }).format(new Date(ms));
+}
 
 export default async function DoorDetailPage({
   params,
@@ -78,6 +86,21 @@ export default async function DoorDetailPage({
   const lockStatus = map ? lockStatusFrom({ online: map.online, mapped: true, activeBackups }) : null;
   const backupsIncomplete = !!map && activeBackups < BACKUP_SLOTS;
   const lockFault = map && lockStatus !== "online" ? await latestLockFault(map.lockId) : null;
+
+  // Per-room door access log (live from TTLock): who/what opened the door, labelled
+  // by matching each unlock to this room's codes (incl. revoked, for history). null
+  // = fetch failed / unavailable; [] = no recent activity. Gated to activity.view.
+  const accessRows =
+    map && can("activity.view")
+      ? await loadAccessRows(
+          map.lockId,
+          codes.map((c) => ({
+            keyboardPwdId: String(c.keyboardPwdId), pin: c.pin, type: c.type,
+            reservationId: c.reservationId, backupSlot: c.backupSlot, label: c.label,
+          })),
+          property.abbr,
+        )
+      : undefined;
   const guestDetails = state?.currentReservationId
     ? await loadGuestDetails(propertyId, state.currentReservationId, roomNumber)
     : null;
@@ -202,6 +225,34 @@ export default async function DoorDetailPage({
             </div>
             {!map && <p className="subtle" style={{ marginTop: 12 }}>Map a lock to this room to set backup codes.</p>}
           </div>
+
+          {map && can("activity.view") && (
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <span className="card-title">Recent access</span>
+                <span className="chip">last 14 days</span>
+              </div>
+              {accessRows == null ? (
+                <p className="subtle">Access history unavailable.</p>
+              ) : accessRows.length === 0 ? (
+                <p className="subtle">No door activity recorded in the last 14 days.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {accessRows.map((r, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? "1px solid var(--divider)" : undefined }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 9, flex: "0 0 auto", background: !r.success ? "var(--crit)" : r.credential === "guest" ? "var(--ok)" : r.credential === "other" ? "#C2CBDA" : "var(--blue)" }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
+                          {r.label}{!r.success && <span style={{ color: "var(--crit-ink)" }}> · failed</span>}
+                        </div>
+                        <div className="mono" style={{ fontSize: 11, color: "var(--faint)", marginTop: 3 }}>{fmtAccessTime(r.at, property.timezone)} · {r.method}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {can("guest_code.generate_manual") && map && (
             <div className="card">

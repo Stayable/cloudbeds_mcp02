@@ -283,3 +283,44 @@ export async function listPasscodes(
   assertOk(body, "lock/listKeyboardPwd");
   return { list: (body.list ?? []) as LockPasscode[] };
 }
+
+export interface LockRecord {
+  recordType: number;
+  success: number;
+  keyboardPwd?: string;
+  keyboardPwdId?: number;
+  lockDate: number;
+  username?: string;
+}
+
+export interface ListLockRecordsOpts {
+  startDate?: number;
+  endDate?: number;
+  pageNo?: number;
+  pageSize?: number;
+}
+
+/**
+ * List a lock's physical access records (who/what opened the door, when) — powers
+ * the per-room door access log. ⚠️ VERIFY LIVE: path/params/response shape against
+ * TTLock docs (same caution as listPasscodes / renamePasscode). Uses
+ * /v3/lockRecord/list (lockId, startDate, endDate, pageNo, pageSize, date); default
+ * window is the last 14 days. Adjust the mapping here only if the live shape differs.
+ */
+export async function listLockRecords(lockId: number | bigint, opts: ListLockRecordsOpts = {}): Promise<{ list: LockRecord[] }> {
+  const { accessToken } = await getTTLockToken();
+  const endDate = opts.endDate ?? Date.now();
+  const startDate = opts.startDate ?? endDate - 14 * 24 * 60 * 60 * 1000;
+  const body = await postForm("/v3/lockRecord/list", {
+    clientId: requiredEnv("TTLOCK_CLIENT_ID"),
+    accessToken,
+    lockId: String(lockId),
+    startDate,
+    endDate,
+    pageNo: opts.pageNo ?? 1,
+    pageSize: opts.pageSize ?? 100,
+    date: Date.now(),
+  });
+  assertOk(body, "lockRecord/list");
+  return { list: (body.list ?? []) as LockRecord[] };
+}
