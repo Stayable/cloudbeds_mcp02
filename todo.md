@@ -3,6 +3,43 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-07-04) — **All shipped + pushed (branch tip 6c0cc58; lock-app 218 tests green, build green).** Auto-deploys live. Big feature session.
+SHIPPED THIS SESSION (2026-07-04, all pushed → auto-deployed):
+  • DASHBOARD "BY ZONE" VIEW: All rooms / By zone toggle on the per-property dashboard (URL param, server-rendered).
+    `lib/zones.ts` ZONE_CONFIG keyed by real Cloudbeds propertyID → buildings as room-number RANGES (TDD). ALL 8
+    properties configured from the *.pdf floor maps: Jax North/Orlando/Kissimmee East/St Aug/Lakeland map-labelled A–E;
+    Jax West + Davenport unlabelled → assumed A/B by wing; **Kissimmee West needed PARITY-qualified ranges** (its wings
+    interleave odd/even in one band — 148 even→E, 149 odd→C). Out-of-range rooms → visible "Other" bucket. Toggle gated
+    by hasZones. Extend a property = add its ranges, no code change.
+  • NAMEABLE BACKUP CODES: pencil on each backup slot → name shows as **<ABBR><roomNumber>-<name>** (e.g. LL231-Maintenance)
+    in the app AND TTLock. `lib/code-naming.ts` (backupCodeLabel/fullCodeName/roomCodePrefix/sanitizeLabel, TDD).
+    `Passcode.label` column added (nullable, pushed to prod Neon via `prisma db push`). renameBackupCode action
+    (backup_code.rotate perm, TTLock-first/fail-closed); name carries across rotate; room# in prefix is DERIVED (no
+    migration). ⭐ ENDPOINT FIX: first shipped `/v3/keyboardPwd/rename` = 404 (doesn't exist) → EVERY rename failed;
+    fixed to **`/v3/keyboardPwd/change`** w/ keyboardPwdName only (changeType omitted = cloud-only, no lock needed).
+    Rename failures now log raw errcode as `backup_code_rename_failed` in Activity.
+  • PER-ROOM DOOR ACCESS LOG (live): "Recent access" card on room page (activity.view). `ttlock.listLockRecords`
+    (POST /v3/lockRecord/list — **VERIFIED WORKING LIVE**). `lib/door-log.ts` classifier (TDD) labels each unlock by
+    matching to Passcode rows: Guest (Res X) / LL231-<name> / Manual / Other-unknown-code. Full authoritative recordType
+    map (10=Mechanical key, 4=Keypad code, etc.; unknown→"Method N"). + CSV export (accessRowsToCsv, client download)
+    + date-range filter (start/end params, default 14d). `lock-record-loader.ts` never-throws → "unavailable" on error.
+  • PROPERTY SWITCHER: sidebar "Portfolio" expands (chevron) to a list of the user's properties for direct nav; label
+    still links to /portfolio. Uses userProperties(); current property highlighted; auto-open inside a property.
+  • BUGFIX: backup-name edit form was overlapping the reveal code → made it an opaque absolute popover.
+VERIFY LIVE NEXT SESSION (sandbox can't reach TTLock/CB):
+  1. Rename a backup code → confirm it sticks + shows **LL<room>-<name>** in app AND TTLock. If it errors, check the
+     room Activity log for `backup_code_rename_failed` + its raw errcode.
+  2. Existing backup codes keep old LL-<name> until rotated/renamed (name is set on write) — rotate a couple to refresh.
+  3. Eyeball By-zone on a few properties (esp. Kissimmee West odd/even, + inferred Jax West/Davenport); mis-ranged
+     rooms show in "Other".
+  4. Door log already confirmed working (records came through). Optional future: reconcile against TTLock's own
+     passcode list so manually-added codes (the "Other / unknown code" entries) get names too. Also possible later:
+     property/fleet-wide door log via DB ingestion (classifier is reusable) — deferred (YAGNI).
+UNTRACKED FILES (decide: commit vs .gitignore): 8 property-map *.pdf (repo root), Stayable mockup zips/folders,
+  .vercel/, email-preview.html, claude-design-*.md, lock-app/prisma/clear-demo-data.ts. None staged.
+Specs written this session: 2026-07-03-...-dashboard-zone-view, 2026-07-04-...-nameable-backup-codes,
+  2026-07-04-...-property-switcher-and-door-log.
+--- prior ---
 RESUME HERE (2026-07-01 latest) — **All shipped + pushed (branch tip ce3c008; lock-app 175 + middleware 42 tests green, both build).** Auto-deploys live.
 SECURITY REVIEW (2026-07-01): ran /security-review over this session's changes (emails, server actions, cron
   route, middleware passcode logic, getGuest). **No HIGH/MEDIUM findings.** Verified: email XSS (all guest fields
