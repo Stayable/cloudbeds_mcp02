@@ -13,9 +13,10 @@ import AutoRefresh from "@/components/AutoRefresh";
 import ActionButton from "@/components/ActionButton";
 import ActionForm from "@/components/ActionForm";
 import RevealButton from "./RevealButton";
+import BackupNameEditor from "./BackupNameEditor";
 import {
   revealGuestCode, revokeGuestCode, generateManualCode,
-  revealBackupCode, rotateBackupCode, syncFromLock, resendGuestCode,
+  revealBackupCode, rotateBackupCode, renameBackupCode, syncFromLock, resendGuestCode,
 } from "./actions";
 import { assignLockToRoom, unmapRoom } from "@/app/(app)/lock-actions";
 
@@ -48,7 +49,7 @@ export default async function DoorDetailPage({
   const rows: PasscodeInput[] = codes.map((c) => ({
     keyboardPwdId: String(c.keyboardPwdId), pin: c.pin, type: c.type, status: c.status,
     startTs: Number(c.startTs), endTs: Number(c.endTs),
-    reservationId: c.reservationId, createdAt: c.createdAt.getTime(), backupSlot: c.backupSlot,
+    reservationId: c.reservationId, createdAt: c.createdAt.getTime(), backupSlot: c.backupSlot, label: c.label,
   }));
   const { guest, backups, manual, history } = splitCodes(rows, Date.now());
   const can = (p: Parameters<typeof sessionCan>[1]) => sessionCan(user, p, propertyId);
@@ -171,7 +172,15 @@ export default async function DoorDetailPage({
                 const slot = i + 1;
                 return (
                   <div key={slot} style={{ display: "flex", alignItems: "center", gap: 12, borderTop: i > 0 ? "1px solid var(--divider)" : undefined, paddingTop: i > 0 ? 10 : 0 }}>
-                    <span className="lbl" style={{ width: 64 }}>Backup {slot}</span>
+                    <span style={{ width: 150 }}>
+                      <BackupNameEditor
+                        abbr={property.abbr}
+                        slot={slot}
+                        label={b?.label ?? null}
+                        canEdit={can("backup_code.rotate") && !!map && !!b}
+                        action={async (name: string) => { "use server"; return renameBackupCode(propertyId, roomId, slot, name); }}
+                      />
+                    </span>
                     <div className="mono" style={{ flex: 1, fontSize: 18, color: b ? "var(--ink)" : "var(--faint)" }}>
                       {b
                         ? (can("backup_code.reveal")

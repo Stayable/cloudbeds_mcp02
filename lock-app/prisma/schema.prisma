@@ -74,6 +74,7 @@ model Passcode {
   status        String // active | revoked | failed
   type          String   @default("guest") // guest | backup | manual
   backupSlot    Int? // backup codes only: which slot (1..5) this PIN occupies; null = legacy/slot 1
+  label         String? // backup codes only: descriptive name part (no <ABBR> prefix), e.g. "Maintenance"; null = default "Backup {slot}"
   // Duplicate-PIN guard: "<reservationId>:<roomId>" while this is the ACTIVE guest
   // code; null otherwise (revoked/expiring, and all manual/backup codes). The
   // unique constraint makes the DB reject a second active guest code for the same

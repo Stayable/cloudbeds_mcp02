@@ -12,6 +12,8 @@ import { prisma } from "./db";
 import { createPasscode, deletePasscode } from "./ttlock";
 import { generatePin, BACKUP_PWD_TYPE } from "./passcodes";
 import { BACKUP_SLOTS } from "./door-detail";
+import { backupCodeLabel, fullCodeName } from "./code-naming";
+import { getProperty } from "./properties";
 
 // TTLock rate-limits rapid writes to the same lock. An assign fires several in a
 // row (rename → delete old codes → create N new), so doing them back-to-back makes
@@ -74,6 +76,7 @@ export async function generateBackupCodesForRoom(args: {
   lockId: bigint;
 }): Promise<{ created: number; failed: number; errors: string[] }> {
   const { propertyId, roomId, lockId } = args;
+  const abbr = getProperty(propertyId)?.abbr ?? "";
   const pins = makeDistinctPins(BACKUP_SLOTS);
   let created = 0;
   const errors: string[] = [];
@@ -88,7 +91,8 @@ export async function generateBackupCodesForRoom(args: {
       if (attempt > 0) await sleep(BACKUP_RETRY_BACKOFF_MS);
       try {
         const { keyboardPwdId } = await createPasscode({
-          lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
+          lockId, passcode: pin, keyboardPwdType: BACKUP_PWD_TYPE,
+          name: fullCodeName(abbr, backupCodeLabel(slot)),
         });
         await prisma.passcode.create({
           data: {

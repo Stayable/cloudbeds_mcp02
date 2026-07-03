@@ -21,6 +21,8 @@ export interface PasscodeInput {
   createdAt: number;
   /** Backup-only: which slot (1..BACKUP_SLOTS) this code occupies. Legacy rows are null → slot 1. */
   backupSlot?: number | null;
+  /** Backup-only: descriptive label part (no <ABBR> prefix), e.g. "Maintenance". Null → default. */
+  label?: string | null;
 }
 
 export interface CodeRow {
@@ -30,6 +32,8 @@ export interface CodeRow {
   status: CodeStatus;
   window: string;
   reservationId: string | null;
+  /** Backup-only: descriptive label part (no prefix); null when unset. */
+  label: string | null;
 }
 
 export function classifyCode(p: PasscodeInput, nowMs: number): CodeStatus {
@@ -58,6 +62,7 @@ export function toCodeRow(p: PasscodeInput, nowMs: number): CodeRow {
     status: classifyCode(p, nowMs),
     window: windowLabel(p),
     reservationId: p.reservationId,
+    label: p.label ?? null,
   };
 }
 

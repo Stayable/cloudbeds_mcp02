@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
-import { deletePasscode, listPasscodes } from "@/lib/ttlock";
+import { deletePasscode, listPasscodes, renamePasscode } from "@/lib/ttlock";
 import { createPasscodeWithRetry } from "@/lib/ttlock-retry";
 import { manualValidityWindow, guestValidityWindow, PERIOD_PWD_TYPE, BACKUP_PWD_TYPE } from "@/lib/passcodes";
 import { BACKUP_SLOTS } from "@/lib/door-detail";
+import { backupCodeLabel, fullCodeName, sanitizeLabel } from "@/lib/code-naming";
+import { getProperty } from "@/lib/properties";
 import { CloudbedsRegistry, getReservation, postReservationNote } from "@/lib/cloudbeds";
 import { detectDrift } from "@/lib/reconcile";
 import { buildDetail } from "@/lib/audit";
@@ -252,10 +254,16 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
     orderBy: { createdAt: "desc" },
   });
 
+  // Carry the slot's custom label across the rotate (the label names the slot's
+  // purpose, not the digits). Falls back to the default "Backup {slot}".
+  const carriedLabel = olds[0]?.label ?? null;
+  const abbr = getProperty(propertyId)?.abbr ?? "";
+  const codeName = fullCodeName(abbr, backupCodeLabel(slot, carriedLabel));
+
   let pin: string, keyboardPwdId: number;
   try {
     ({ pin, keyboardPwdId } = await createPasscodeWithRetry((p) => ({
-      lockId: map.lockId, passcode: p, keyboardPwdType: BACKUP_PWD_TYPE, name: `Backup ${slot}`,
+      lockId: map.lockId, passcode: p, keyboardPwdType: BACKUP_PWD_TYPE, name: codeName,
     })));
   } catch (e) {
     // Log the RAW TTLock error (errcode/errmsg) so a "something went wrong" is
@@ -274,6 +282,7 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
       reservationId: null, propertyId, roomId, lockId: map.lockId,
       keyboardPwdId: BigInt(keyboardPwdId), pin,
       startTs: BigInt(0), endTs: BigInt(0), status: "active", type: "backup", backupSlot: slot,
+      label: carriedLabel,
     },
   });
   // The lock just accepted a write → it's reachable. Clear any stale offline flag.
@@ -290,6 +299,42 @@ export async function rotateBackupCode(propertyId: string, roomId: string, slot:
   await writeAudit(user, {
     action: "backup_code_rotated", propertyId, roomId, lockId: map.lockId,
     detail: buildDetail({ beforePin: olds[0]?.pin, afterPin: pin, extra: { slot } }),
+  });
+  revalidatePath(detailPath(propertyId, roomId));
+  return { ok: true };
+}
+
+/**
+ * Rename one staff backup slot: set a descriptive label (shown/written as
+ * `<ABBR>-<label>`, e.g. "LL-Maintenance"). TTLock-first so the app and the
+ * TTLock account never disagree — on a TTLock failure the DB label is left
+ * unchanged. An empty label resets the slot to the default "Backup {slot}".
+ */
+export async function renameBackupCode(propertyId: string, roomId: string, slot: number, rawLabel: string): Promise<ActionResult> {
+  assertSlot(slot);
+  const user = await requirePermission("backup_code.rotate", propertyId);
+  const code = await prisma.passcode.findFirst({
+    where: { propertyId, roomId, type: "backup", status: "active", ...backupSlotWhere(slot) },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!code) return { ok: false, error: `No backup code in slot ${slot} yet — create one before naming it.` };
+
+  const clean = sanitizeLabel(rawLabel ?? "");
+  const label = clean || null; // "" → reset to default label
+  const abbr = getProperty(propertyId)?.abbr ?? "";
+  const codeName = fullCodeName(abbr, backupCodeLabel(slot, label));
+
+  try {
+    await renamePasscode({ lockId: code.lockId, keyboardPwdId: code.keyboardPwdId, name: codeName });
+  } catch (e) {
+    return { ok: false, error: mapActionError(e) };
+  }
+  await prisma.passcode.update({ where: { id: code.id }, data: { label } });
+  // A successful rename means the lock/cloud accepted the write → clear stale offline.
+  await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: true } }).catch(() => {});
+  await writeAudit(user, {
+    action: "backup_code_renamed", propertyId, roomId, lockId: code.lockId,
+    detail: buildDetail({ extra: { slot, name: codeName, before: code.label ?? null, after: label } }),
   });
   revalidatePath(detailPath(propertyId, roomId));
   return { ok: true };

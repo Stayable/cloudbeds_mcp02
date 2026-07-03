@@ -27,6 +27,23 @@ describe("classifyCode", () => {
   });
 });
 
+describe("splitCodes carries the backup label", () => {
+  it("passes a backup code's label onto its CodeRow", () => {
+    const rows: PasscodeInput[] = [
+      { ...base, keyboardPwdId: "b1", type: "backup", endTs: 0, backupSlot: 1, label: "Maintenance" },
+    ];
+    const out = splitCodes(rows, NOW);
+    expect(out.backups[0]?.label).toBe("Maintenance");
+  });
+  it("leaves label null when unset", () => {
+    const rows: PasscodeInput[] = [
+      { ...base, keyboardPwdId: "b2", type: "backup", endTs: 0, backupSlot: 2 },
+    ];
+    const out = splitCodes(rows, NOW);
+    expect(out.backups[1]?.label).toBeNull();
+  });
+});
+
 describe("splitCodes with an expiring code", () => {
   it("keeps an expiring guest code out of the active slot (sends it to history)", () => {
     const rows: PasscodeInput[] = [
