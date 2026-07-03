@@ -59,8 +59,17 @@ export default function BackupNameEditor({
     });
   }
 
+  // Editing UI is an opaque popover anchored to the row (absolute) so it never
+  // overlaps the reveal-code / rotate controls in the fixed-width name column.
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <span
+      style={{
+        position: "absolute", top: -8, left: 0, zIndex: 20,
+        display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+        background: "var(--surface)", border: "1px solid var(--line-2)", borderRadius: 9,
+        padding: "6px 8px", boxShadow: "0 6px 20px rgba(16,24,40,.14)",
+      }}
+    >
       {abbr && <span className="mono" style={{ fontSize: 13, color: "var(--faint)" }}>{abbr}-</span>}
       <input
         autoFocus

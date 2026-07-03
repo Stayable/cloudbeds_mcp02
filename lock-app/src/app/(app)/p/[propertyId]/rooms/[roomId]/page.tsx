@@ -172,7 +172,7 @@ export default async function DoorDetailPage({
                 const slot = i + 1;
                 return (
                   <div key={slot} style={{ display: "flex", alignItems: "center", gap: 12, borderTop: i > 0 ? "1px solid var(--divider)" : undefined, paddingTop: i > 0 ? 10 : 0 }}>
-                    <span style={{ width: 150 }}>
+                    <span style={{ width: 150, position: "relative" }}>
                       <BackupNameEditor
                         abbr={property.abbr}
                         slot={slot}
