@@ -42,7 +42,7 @@ export default function ActionError({ message, onClose }: { message: string; onC
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: "var(--ink)", marginBottom: 4 }}>Couldn’t complete that</div>
-            <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--ink-2, #475467)" }}>{message}</p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--ink-2, #475467)" }}>{message?.trim() || "Please try again."}</p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} style={{
             border: "none", background: "transparent", cursor: "pointer", padding: 4,

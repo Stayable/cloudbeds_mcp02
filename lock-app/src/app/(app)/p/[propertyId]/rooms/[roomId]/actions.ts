@@ -327,6 +327,14 @@ export async function renameBackupCode(propertyId: string, roomId: string, slot:
   try {
     await renamePasscode({ lockId: code.lockId, keyboardPwdId: code.keyboardPwdId, name: codeName });
   } catch (e) {
+    // Log the RAW TTLock error (errcode/errmsg) so a "something went wrong" is
+    // diagnosable from the Activity log — the friendly modal text hides the code.
+    const raw = e instanceof Error ? e.message : String(e);
+    if (isUnreachableLockError(e)) await prisma.lockMap.updateMany({ where: { propertyId, roomId }, data: { online: false } }).catch(() => {});
+    await writeAudit(user, {
+      action: "backup_code_rename_failed", propertyId, roomId, lockId: code.lockId,
+      detail: buildDetail({ outcome: "warning", message: raw, extra: { slot, name: codeName } }),
+    }).catch(() => {});
     return { ok: false, error: mapActionError(e) };
   }
   await prisma.passcode.update({ where: { id: code.id }, data: { label } });

@@ -190,23 +190,24 @@ export interface RenamePasscodeArgs {
 }
 
 /**
- * Rename an existing passcode WITHOUT changing its digits or window. The passcode
- * name is TTLock CLOUD metadata (not stored on the physical keypad), so this does
- * not require the lock to be online. changeType=2 matches our other write calls.
- * ⚠️ VERIFY LIVE: path/params against TTLock docs (same caution as listPasscodes).
+ * Rename an existing passcode WITHOUT changing its digits or window. Uses
+ * /v3/keyboardPwd/change with ONLY keyboardPwdName set (newKeyboardPwd/startDate/
+ * endDate omitted = keep them). changeType is omitted deliberately: the name is
+ * TTLock CLOUD metadata, so a name-only change updates server-side and does NOT
+ * require the lock to be online. (There is no /keyboardPwd/rename endpoint — that
+ * path 404s; /change is the correct one per the TTLock docs.)
  */
 export async function renamePasscode(args: RenamePasscodeArgs): Promise<void> {
   const { accessToken } = await getTTLockToken();
-  const body = await postForm("/v3/keyboardPwd/rename", {
+  const body = await postForm("/v3/keyboardPwd/change", {
     clientId: requiredEnv("TTLOCK_CLIENT_ID"),
     accessToken,
     lockId: String(args.lockId),
     keyboardPwdId: String(args.keyboardPwdId),
     keyboardPwdName: args.name,
-    changeType: 2,
     date: Date.now(),
   });
-  assertOk(body, "keyboardPwd/rename");
+  assertOk(body, "keyboardPwd/change");
 }
 
 export async function deletePasscode(args: DeletePasscodeArgs): Promise<void> {
