@@ -1,13 +1,17 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+interface PropertyNav { id: string; name: string; abbr: string }
 
 /** Persistent navy sidebar: FLEET nav always, PROPERTY nav when inside a property. */
 export default function Sidebar({
-  name, role, canDiscover, canRooms, canDevices, canActivity, canSettings, unassignedCount,
+  name, role, properties, canDiscover, canRooms, canDevices, canActivity, canSettings, unassignedCount,
 }: {
   name: string;
   role: string;
+  properties: PropertyNav[];
   canDiscover: boolean;
   canRooms: boolean;
   canDevices: boolean;
@@ -19,6 +23,8 @@ export default function Sidebar({
   const pid = path.match(/^\/p\/([^/]+)/)?.[1];
   const is = (href: string) => path === href || path.startsWith(href + "/");
   const initials = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "—";
+  // Property switcher: expanded by default when you're inside a property.
+  const [open, setOpen] = useState(!!pid);
 
   return (
     <aside className="sidebar">
@@ -27,9 +33,33 @@ export default function Sidebar({
       </div>
       <nav className="sidebar-nav">
         <div className="sidebar-label">Fleet</div>
-        <Link href="/portfolio" className={`navitem${is("/portfolio") ? " active" : ""}`}>
-          <Icon.grid /><span>Portfolio</span>
-        </Link>
+        {/* Portfolio stays a link; the chevron toggles the property switcher list. */}
+        <div className={`navitem navitem-switch${is("/portfolio") ? " active" : ""}`}>
+          <Link href="/portfolio" className="navitem-main">
+            <Icon.grid /><span>Portfolio</span>
+          </Link>
+          {properties.length > 0 && (
+            <button
+              type="button"
+              className="navitem-chevron"
+              aria-label={open ? "Collapse properties" : "Expand properties"}
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .12s ease" }}><path d="M4 6l4 4 4-4" /></svg>
+            </button>
+          )}
+        </div>
+        {open && properties.length > 0 && (
+          <div className="switcher">
+            {properties.map((p) => (
+              <Link key={p.id} href={`/p/${p.id}/dashboard`} className={`switcher-item${pid === p.id ? " current" : ""}`}>
+                <span className="switcher-abbr">{p.abbr}</span>
+                <span className="switcher-name">{p.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
         {canDiscover && (
           <Link href="/unassigned" className={`navitem${is("/unassigned") ? " active" : ""}`}>
             <Icon.lock /><span>Unassigned</span>

@@ -106,6 +106,19 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-badge.crit { background: var(--crit); color: #fff; }
 .nav-badge.gold { background: var(--gold); color: var(--navy); }
+
+/* Portfolio property switcher: Portfolio label stays a link; chevron toggles the list. */
+.navitem-switch { padding: 0; gap: 0; }
+.navitem-main { display: flex; align-items: center; gap: 11px; flex: 1; padding: 9px 10px; color: inherit; text-decoration: none; border-radius: var(--radius-sm); min-width: 0; }
+.navitem-chevron { background: none; border: none; color: var(--on-navy-faint); cursor: pointer; padding: 9px 10px; display: flex; align-items: center; border-radius: var(--radius-sm); }
+.navitem-chevron:hover { color: #fff; }
+.switcher { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 13px; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.12); }
+.switcher-item { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: var(--radius-sm); color: var(--on-navy); font-size: 12.5px; font-weight: 500; text-decoration: none; transition: background .12s, color .12s; }
+.switcher-item:hover { background: rgba(255,255,255,.05); color: #fff; }
+.switcher-item.current { background: rgba(255,255,255,.09); color: #fff; }
+.switcher-abbr { font-family: var(--font-mono-stack); font-size: 10px; font-weight: 700; background: rgba(255,255,255,.10); color: var(--on-navy); border-radius: 5px; padding: 2px 5px; min-width: 24px; text-align: center; flex: 0 0 auto; }
+.switcher-item.current .switcher-abbr { background: var(--gold); color: var(--navy); }
+.switcher-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-user {
   padding: 12px; border-top: 1px solid rgba(255,255,255,.07);
   display: flex; align-items: center; gap: 10px;
@@ -299,8 +312,9 @@ details.accordion[open] > summary .accordion-chevron { transform: rotate(180deg)
 /* Sidebar collapses on narrow screens (content stays usable; full mobile nav TBD). */
 @media (max-width: 860px) {
   .sidebar { flex-basis: 64px; width: 64px; }
-  .sidebar-brand img, .navitem span, .nav-badge, .sidebar-label, .sidebar-user .nm, .sidebar-user .rl { display: none; }
-  .navitem { justify-content: center; }
+  .sidebar-brand img, .navitem span, .nav-badge, .sidebar-label, .sidebar-user .nm, .sidebar-user .rl,
+  .navitem-chevron, .switcher, .switcher-name { display: none; }
+  .navitem, .navitem-main { justify-content: center; }
   .content { padding: 20px 16px 40px; }
 }
 
