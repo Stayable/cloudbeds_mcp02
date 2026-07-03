@@ -8,13 +8,41 @@ function chip(label: string, status: RoomChip["status"] = "vacant"): RoomChip {
   return { roomId: `id-${label}`, label, status, fault: null };
 }
 
+const KISSIMMEE_WEST = "210969"; // intentionally unzoned (odd/even interleaved wings)
+
 describe("hasZones", () => {
-  it("is true for Lakeland", () => {
-    expect(hasZones(LAKELAND)).toBe(true);
+  it("is true for every configured property", () => {
+    for (const id of ["210972", "206628", "210971", "210986", "208155", "210987", "318197"]) {
+      expect(hasZones(id)).toBe(true);
+    }
   });
   it("is false for a property without a zone config", () => {
-    expect(hasZones("206628")).toBe(false); // Jacksonville North
+    expect(hasZones(KISSIMMEE_WEST)).toBe(false); // Kissimmee West — not range-partitionable
   });
+});
+
+describe("configured properties partition sample rooms", () => {
+  // A representative room from each building of each configured property lands in
+  // that building (not "Other") — guards against a bad range edit.
+  const cases: Array<[string, Array<[string, string]>]> = [
+    ["206628", [["Building A", "103"], ["Building B", "316"], ["Building C", "230"], ["Building D", "347"]]],
+    ["210971", [["Building A", "1103"], ["Building B", "1243"], ["Building C", "2234"], ["Building D", "3102"]]],
+    ["210986", [["Building A", "100"], ["Building B", "220"], ["Building C", "159"], ["Building D", "279"], ["Building E", "180"]]],
+    ["208155", [["Building A", "155"], ["Building B", "101"], ["Building C", "273"], ["Building D", "120"]]],
+    ["210987", [["Building A", "100"], ["Building B", "233"], ["Building C", "149"], ["Building D", "250"], ["Building E", "425"]]],
+    ["318197", [["Building A", "140"], ["Building B", "282"]]],
+  ];
+  for (const [propertyId, expectations] of cases) {
+    it(`assigns rooms correctly for ${propertyId}`, () => {
+      const chipsIn = expectations.map(([, label]) => chip(label));
+      const zones = groupChipsByZone(propertyId, chipsIn);
+      expect(zones.some((z) => z.zoneName === "Other")).toBe(false);
+      const zoneOf = (label: string) => zones.find((z) => z.chips.some((c) => c.label === label))?.zoneName;
+      for (const [expectedZone, label] of expectations) {
+        expect(zoneOf(label)).toBe(expectedZone);
+      }
+    });
+  }
 });
 
 describe("groupChipsByZone (Lakeland)", () => {
@@ -74,6 +102,6 @@ describe("groupChipsByZone (Lakeland)", () => {
   });
 
   it("returns no zones for a property without a config", () => {
-    expect(groupChipsByZone("206628", [chip("100")])).toEqual([]);
+    expect(groupChipsByZone(KISSIMMEE_WEST, [chip("100")])).toEqual([]);
   });
 });
