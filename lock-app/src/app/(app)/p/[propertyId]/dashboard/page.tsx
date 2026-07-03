@@ -6,6 +6,7 @@ import { buildDashboard, type Occupancy } from "@/lib/dashboard";
 import { buildRoomChips, type RoomChipInput } from "@/lib/rooms";
 import { CloudbedsRegistry, listRooms } from "@/lib/cloudbeds";
 import RoomHeatmap, { RoomHeatmapLegend } from "@/components/RoomHeatmap";
+import { hasZones, groupChipsByZone } from "@/lib/zones";
 import OccupancySyncButton from "@/components/OccupancySyncButton";
 import RoomChangeSyncButton from "@/components/RoomChangeSyncButton";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -13,7 +14,12 @@ import Forbidden from "@/components/Forbidden";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ params }: { params: { propertyId: string } }) {
+export default async function DashboardPage({
+  params, searchParams,
+}: {
+  params: { propertyId: string };
+  searchParams?: { view?: string };
+}) {
   const user = await requireUserOrRedirect();
   const { propertyId } = params;
   if (!sessionCan(user, "rooms.view", propertyId)) return <Forbidden what="this property" />;
@@ -55,6 +61,13 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
   ];
   const roomChips = buildRoomChips(chipInputs);
 
+  // Zone (building) view: a pure regrouping of the same chips, gated to
+  // properties with a defined layout (Lakeland today). URL param drives it so
+  // the toggle is server-rendered and shareable.
+  const zonesAvailable = hasZones(propertyId);
+  const zoneView = searchParams?.view === "zone" && zonesAvailable;
+  const zonedChips = zoneView ? groupChipsByZone(propertyId, roomChips) : [];
+
   const { kpis, actions } = buildDashboard({
     locks: locks.map((l) => ({ roomId: l.roomId, online: l.online, battery: l.battery })),
     states: states.map((s) => ({ roomId: s.roomId, occupancyStatus: s.occupancyStatus as Occupancy })),
@@ -92,6 +105,12 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
           <span className="card-title">All rooms{roomChips.length ? ` · ${roomChips.length}` : ""}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            {zonesAvailable && (
+              <div className="seg" role="group" aria-label="Room view">
+                <Link href={`/p/${propertyId}/dashboard`} className={`seg-btn${zoneView ? "" : " seg-on"}`} scroll={false}>All rooms</Link>
+                <Link href={`/p/${propertyId}/dashboard?view=zone`} className={`seg-btn${zoneView ? " seg-on" : ""}`} scroll={false}>By zone</Link>
+              </div>
+            )}
             {sessionCan(user, "lock.sync", propertyId) && <OccupancySyncButton propertyId={propertyId} />}
             {sessionCan(user, "lock.sync", propertyId) && <RoomChangeSyncButton propertyId={propertyId} />}
             <Link href={`/p/${propertyId}/rooms`} style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>List view</Link>
@@ -99,6 +118,19 @@ export default async function DashboardPage({ params }: { params: { propertyId: 
         </div>
         {roomChips.length === 0 ? (
           <p className="subtle">No rooms found — check the Cloudbeds key for this property.</p>
+        ) : zoneView ? (
+          <>
+            {zonedChips.map((z) => (
+              <div key={z.zoneName} style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{z.zoneName}</span>
+                  <span className="subtle" style={{ fontSize: 12 }}>{z.occupied} occupied / {z.total}</span>
+                </div>
+                <RoomHeatmap chips={z.chips} variant="numbered" propertyId={propertyId} from="dashboard" />
+              </div>
+            ))}
+            <div style={{ marginTop: 12 }}><RoomHeatmapLegend /></div>
+          </>
         ) : (
           <>
             <RoomHeatmap chips={roomChips} variant="numbered" propertyId={propertyId} from="dashboard" />
