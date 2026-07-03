@@ -8,16 +8,16 @@ function chip(label: string, status: RoomChip["status"] = "vacant"): RoomChip {
   return { roomId: `id-${label}`, label, status, fault: null };
 }
 
-const KISSIMMEE_WEST = "210969"; // intentionally unzoned (odd/even interleaved wings)
+const UNCONFIGURED = "999999"; // not a real property — no zone config
 
 describe("hasZones", () => {
-  it("is true for every configured property", () => {
-    for (const id of ["210972", "206628", "210971", "210986", "208155", "210987", "318197"]) {
+  it("is true for every configured property (all 8)", () => {
+    for (const id of ["210972", "206628", "210971", "210986", "208155", "210987", "318197", "210969"]) {
       expect(hasZones(id)).toBe(true);
     }
   });
   it("is false for a property without a zone config", () => {
-    expect(hasZones(KISSIMMEE_WEST)).toBe(false); // Kissimmee West — not range-partitionable
+    expect(hasZones(UNCONFIGURED)).toBe(false);
   });
 });
 
@@ -31,6 +31,10 @@ describe("configured properties partition sample rooms", () => {
     ["208155", [["Building A", "155"], ["Building B", "101"], ["Building C", "273"], ["Building D", "120"]]],
     ["210987", [["Building A", "100"], ["Building B", "233"], ["Building C", "149"], ["Building D", "250"], ["Building E", "425"]]],
     ["318197", [["Building A", "140"], ["Building B", "282"]]],
+    // Kissimmee West — parity is load-bearing: 123/125 (odd) → B, 124/146 (even) → C.
+    ["210969", [["Building A", "101"], ["Building A", "222"], ["Building B", "123"], ["Building B", "125"],
+      ["Building C", "124"], ["Building C", "146"], ["Building C", "149"], ["Building C", "163"],
+      ["Building D", "165"], ["Building E", "148"], ["Building E", "189"]]],
   ];
   for (const [propertyId, expectations] of cases) {
     it(`assigns rooms correctly for ${propertyId}`, () => {
@@ -102,6 +106,6 @@ describe("groupChipsByZone (Lakeland)", () => {
   });
 
   it("returns no zones for a property without a config", () => {
-    expect(groupChipsByZone(KISSIMMEE_WEST, [chip("100")])).toEqual([]);
+    expect(groupChipsByZone(UNCONFIGURED, [chip("100")])).toEqual([]);
   });
 });

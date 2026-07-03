@@ -11,10 +11,19 @@
  */
 import type { RoomChip } from "./rooms";
 
+type Parity = "odd" | "even";
+
+/**
+ * An inclusive [low, high] room-number range, optionally restricted to one
+ * PARITY. Parity is needed where a building's two facing corridors carry all-odd
+ * numbers on one side and all-even on the other within the same band (e.g.
+ * Kissimmee West) — a plain range would swallow rooms belonging to a neighbour.
+ */
+type Range = [number, number] | [number, number, Parity];
+
 interface Zone {
   name: string;
-  /** Inclusive [low, high] room-number ranges belonging to this building. */
-  ranges: [number, number][];
+  ranges: Range[];
 }
 
 /**
@@ -22,10 +31,8 @@ interface Zone {
  * floor map (see the *.pdf maps in the repo root). Buildings are keyed by
  * room-number RANGES. Where the map labels buildings we use those labels; where
  * it doesn't but the wings split cleanly by number, we assume A/B/… by wing.
- *
- * NOT listed here (intentionally): Kissimmee West (210969) — its wings interleave
- * odd/even room numbers within the same number band, so a range can't separate
- * them; it needs odd/even support before it can be zoned faithfully.
+ * Where a wing's two corridors are all-odd on one side / all-even on the other
+ * (Kissimmee West), the ranges carry a parity to separate them.
  */
 const ZONE_CONFIG: Record<string, Zone[]> = {
   // Lakeland — map-labelled Buildings A–D.
@@ -79,6 +86,18 @@ const ZONE_CONFIG: Record<string, Zone[]> = {
     { name: "Building A", ranges: [[103, 140], [201, 240]] },
     { name: "Building B", ranges: [[141, 182], [241, 282]] },
   ],
+  // Kissimmee West — unlabelled map; assumed A–E by wing. Wings share number
+  // bands but split by parity (odd corridor vs even corridor), so ranges are
+  // parity-qualified. A: front block (both parities) · B: bottom-left (odd) ·
+  // C: left corridor (odd outer + even inner) · D: top-left (odd) ·
+  // E: top-right (odd outer + even inner). A handful of 3xx lobby rooms → "Other".
+  "210969": [
+    { name: "Building A", ranges: [[101, 122], [201, 222]] },
+    { name: "Building B", ranges: [[123, 131, "odd"], [223, 231, "odd"]] },
+    { name: "Building C", ranges: [[133, 163, "odd"], [124, 146, "even"], [233, 263, "odd"], [224, 254, "even"]] },
+    { name: "Building D", ranges: [[165, 173, "odd"], [265, 273, "odd"]] },
+    { name: "Building E", ranges: [[175, 189, "odd"], [148, 162, "even"], [275, 289, "odd"], [256, 270, "even"]] },
+  ],
 };
 
 const OTHER = "Other";
@@ -103,8 +122,13 @@ const OCCUPIED_STATUSES: ReadonlySet<RoomChip["status"]> = new Set([
   "occupied-no-lock",
 ]);
 
-function inRange(n: number, ranges: [number, number][]): boolean {
-  return ranges.some(([lo, hi]) => n >= lo && n <= hi);
+function inRange(n: number, ranges: Range[]): boolean {
+  return ranges.some(([lo, hi, parity]) => {
+    if (n < lo || n > hi) return false;
+    if (parity === "odd") return n % 2 === 1;
+    if (parity === "even") return n % 2 === 0;
+    return true;
+  });
 }
 
 /**
