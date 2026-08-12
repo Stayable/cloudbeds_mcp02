@@ -3,6 +3,54 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-08-13) — **USERS PAGE SHIPPED** (`/users`). 242 tests green, typecheck + build green,
+schema pushed to prod Neon. Spec: `docs/superpowers/specs/2026-08-13-lock-app-user-management-design.md`.
+WHAT SHIPPED:
+  • `/users` page (global, beside /settings): roster w/ Name·Email·Role·Access·Status·Last sign-in.
+    `users.view` = read-only (manager/attendant); `users.manage` = mutate (super_admin only). Sidebar "Users"
+    entry under Fleet (canUsers prop). Inline edit row → name + role + property scope; "+ Add user" card.
+  • ⭐ AUTH MODEL NOTE: lock-app is **OTP-only, no passwords** — so "add" and "invite" are ONE action (a User
+    row IS access), and "change password" ships as **Reset access** (kill sessions + burn unused codes → next
+    sign-in needs a fresh OTP). "Delete" = **archive** (row retained so EventLog can still resolve the actor).
+  • SCHEMA (User, pushed to prod Neon — additive nullable, no data loss): `disabledAt`, `archivedAt`, `lastLoginAt`.
+  • AUTH ENFORCEMENT (the part that makes disable real, lib/auth.ts): createOtp refuses disabled/archived
+    SILENTLY (same shape as unknown email → no enumeration leak); verifyOtp re-checks at redemption + sets
+    lastLoginAt; **getSession returns null for disabled/archived → an already-signed-in user is booted on
+    their next request**, not when their 8h JWT lapses. Disable/archive/reset also delete Session rows + mark
+    unused MagicLinks used.
+  • SAFETY RAILS (lib/user-admin.ts, TDD): (1) can't disable/archive/re-role YOUR OWN account (rename is fine);
+    (2) the last ACTIVE super_admin can't be disabled/archived/demoted — there's no console fallback, so this
+    is what stops one click locking everyone out permanently. Role/scope change also drops that user's sessions
+    so a narrowed scope can't stay live.
+  • Welcome/invite email (lib/user-invite-email.ts) reusing emailShell → matches the 2026-07-01 email system.
+    Best-effort like the OTP: failure logs `user_invite_failed`, NEVER blocks user creation.
+  • Every action writes an EventLog row (user_added/updated/disabled/enabled/archived/restored/access_reset/
+    invited) — makes admin actions auditable, the standing shared-mailbox concern. writeAudit propertyId now
+    optional (portfolio-wide actions; column was already nullable).
+VERIFY LIVE NEXT (sandbox can't reach the deployed app):
+  1. Add a throwaway user → invite email arrives → they can request a code and sign in.
+  2. Disable them → OTP refused AND any open session booted on next click. Enable → works again.
+  3. Scope a user to one property → their sidebar/portfolio shows only that property.
+  4. Delete → leaves the list, "Show deleted" restores them, Activity log still names them.
+  5. Try to disable yourself / the last super_admin → expect the friendly refusal modal, not a crash.
+THEN (now UI work, no code changes): scope Gerardo + Crystal down from super_admin, fix the placeholder
+  display names (Admin/Kate/Rob), decide whether shared admin@rentstayable.com keeps full super_admin.
+--- prior ---
+RESUME HERE (2026-07-18) — Light session, read-only user audit (no code changes). Confirmed lock-app is
+**OTP-only — NO passwords stored** (User model has no password/passwordHash; login = 6-digit Resend OTP minted
+only for emails already in the User table). Queried prod Neon live: **7 users, ALL super_admin / scope=all** —
+bke@rise8companies.com, rb@rise8companies.com, admin@rentstayable.com, bke@rentstayable.com, kate@rentstayable.com,
+gerardo@rentstayable.com, crystal@rentstayable.com. OPEN (BK said "no need" for now): Gerardo+Crystal still
+super_admin (earlier flagged as maybe-should-be-scoped); placeholder display names (Admin/Kate/Rob);
+admin@rentstayable.com is a shared mailbox w/ full super_admin (collapses EventLog audit trail). Verify items
+from 2026-07-04 (backup-rename, By-zone, rotate-to-refresh) STILL UNVERIFIED live — see below.
+--- prior ---
+RESUME HERE (2026-07-09) — Light session. Created **`ROOM-ZONING.md`** (repo root): human-readable
+reference of every property → building/zone → room-number ranges, generated from `lock-app/src/lib/zones.ts`
+(ZONE_CONFIG, the source of truth). Includes street-code↔Cloudbeds-ID table + parity notes for Kissimmee West
++ caveat that Jax West/Davenport/KW wings are inferred (provisional). UNTRACKED, not committed. If zones.ts
+changes, re-sync this doc (it's a snapshot, not auto-generated). Still-open verify items from 2026-07-04 below.
+--- prior ---
 RESUME HERE (2026-07-04) — **All shipped + pushed (branch tip 6c0cc58; lock-app 218 tests green, build green).** Auto-deploys live. Big feature session.
 SHIPPED THIS SESSION (2026-07-04, all pushed → auto-deployed):
   • DASHBOARD "BY ZONE" VIEW: All rooms / By zone toggle on the per-property dashboard (URL param, server-rendered).

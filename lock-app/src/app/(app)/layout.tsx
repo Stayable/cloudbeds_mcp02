@@ -22,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         canDevices={sessionCan(user, "devices.view")}
         canActivity={sessionCan(user, "activity.view")}
         canSettings={sessionCan(user, "settings.manage")}
+        canUsers={sessionCan(user, "users.view")}
         unassignedCount={unassignedCount}
       />
       <div className="main">

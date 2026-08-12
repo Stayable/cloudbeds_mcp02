@@ -5,7 +5,8 @@ export async function writeAudit(
   actor: { id: string; email: string; roleName: string },
   entry: {
     action: string;
-    propertyId: string;
+    /** Omit for portfolio-wide actions (e.g. user administration) — the column is nullable. */
+    propertyId?: string;
     roomId?: string;
     lockId?: bigint | null;
     event?: string;
@@ -16,7 +17,7 @@ export async function writeAudit(
     data: {
       source: "admin",
       event: entry.event ?? entry.action,
-      propertyId: entry.propertyId,
+      propertyId: entry.propertyId ?? null,
       roomId: entry.roomId ?? null,
       lockId: entry.lockId ?? null,
       action: entry.action,

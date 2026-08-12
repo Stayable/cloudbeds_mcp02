@@ -116,6 +116,14 @@ model User {
   groupId     String? // when scopeType = group
   createdAt   DateTime @default(now())
 
+  // Access lifecycle (Users page). disabledAt = locked out now but reversible;
+  // archivedAt = "deleted" — hidden from the list, row RETAINED so the EventLog
+  // audit trail can still resolve who did what. lastLoginAt distinguishes a user
+  // who was invited but never signed in (invite may not have landed).
+  disabledAt  DateTime?
+  archivedAt  DateTime?
+  lastLoginAt DateTime?
+
   notificationPrefs   Json?
   notificationsSeenAt DateTime?
 

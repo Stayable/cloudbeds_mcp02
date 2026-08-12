@@ -7,7 +7,7 @@ interface PropertyNav { id: string; name: string; abbr: string }
 
 /** Persistent navy sidebar: FLEET nav always, PROPERTY nav when inside a property. */
 export default function Sidebar({
-  name, role, properties, canDiscover, canRooms, canDevices, canActivity, canSettings, unassignedCount,
+  name, role, properties, canDiscover, canRooms, canDevices, canActivity, canSettings, canUsers, unassignedCount,
 }: {
   name: string;
   role: string;
@@ -17,6 +17,7 @@ export default function Sidebar({
   canDevices: boolean;
   canActivity: boolean;
   canSettings: boolean;
+  canUsers: boolean;
   unassignedCount: number;
 }) {
   const path = usePathname() ?? "";
@@ -64,6 +65,11 @@ export default function Sidebar({
           <Link href="/unassigned" className={`navitem${is("/unassigned") ? " active" : ""}`}>
             <Icon.lock /><span>Unassigned</span>
             {unassignedCount > 0 && <span className="nav-badge gold">{unassignedCount}</span>}
+          </Link>
+        )}
+        {canUsers && (
+          <Link href="/users" className={`navitem${is("/users") ? " active" : ""}`}>
+            <Icon.users /><span>Users</span>
           </Link>
         )}
         {canSettings && (
@@ -120,4 +126,5 @@ const Icon = {
   device: () => <svg {...sw}><rect x="4" y="2.5" width="10" height="13" rx="2" /><path d="M7 6h4M7 9h4M7 12h2" strokeLinecap="round" /></svg>,
   pulse: () => <svg {...sw} strokeLinecap="round"><path d="M2 9h3l1.5-4 3 9 1.5-5H16" /></svg>,
   gear: () => <svg {...sw}><circle cx="9" cy="9" r="2.4" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4" strokeLinecap="round" /></svg>,
+  users: () => <svg {...sw}><circle cx="7" cy="6" r="2.6" /><path d="M2.5 15c0-2.5 2-4.2 4.5-4.2s4.5 1.7 4.5 4.2" strokeLinecap="round" /><path d="M12.2 4.2a2.4 2.4 0 010 4.6M13.5 14.6c0-2 .6-3 2-3.4" strokeLinecap="round" /></svg>,
 };

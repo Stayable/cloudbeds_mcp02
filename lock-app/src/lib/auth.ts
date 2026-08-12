@@ -19,7 +19,9 @@ export interface SessionUser {
 
 export async function createOtp(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return; // don't leak which emails exist
+  // Disabled/archived users are refused SILENTLY — identical to the unknown-email
+  // path above, so the response shape never reveals whether an account exists.
+  if (!user || user.disabledAt || user.archivedAt) return;
   const code = generateOtpCode();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   await prisma.magicLink.create({
@@ -49,10 +51,22 @@ export async function verifyOtp(
   }
   await prisma.magicLink.update({ where: { id: link.id }, data: { used: true } });
 
+  // Re-check access at redemption: a code minted before the account was disabled
+  // must not still buy a session.
+  const account = await prisma.user.findUnique({ where: { id: link.userId } });
+  if (!account || account.disabledAt || account.archivedAt) {
+    return { success: false, error: "This account no longer has access." };
+  }
+
   const sessionToken = jwt.sign({ userId: link.userId }, JWT_SECRET, { expiresIn: "8h" });
   const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
   await prisma.session.create({
     data: { userId: link.userId, token: sessionToken, expiresAt },
+  });
+  // Drives the "invited, never signed in" status on the Users page.
+  await prisma.user.update({
+    where: { id: link.userId },
+    data: { lastLoginAt: new Date() },
   });
 
   const cookieStore = await cookies();
@@ -81,6 +95,9 @@ export async function getSession(): Promise<SessionUser | null> {
   });
   if (!session?.user) return null;
   const u = session.user;
+  // Disabling a user must take effect NOW, not whenever their 8-hour JWT lapses:
+  // an already-signed-in user is treated as logged out on their next request.
+  if (u.disabledAt || u.archivedAt) return null;
   return {
     id: u.id,
     email: u.email,
