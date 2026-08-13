@@ -3,8 +3,25 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
-RESUME HERE (2026-08-13) — **USERS PAGE SHIPPED** (`/users`). 242 tests green, typecheck + build green,
-schema pushed to prod Neon. Spec: `docs/superpowers/specs/2026-08-13-lock-app-user-management-design.md`.
+RESUME HERE (2026-08-13) — **USERS PAGE SHIPPED** (`/users`) + **BUILD-BREAKING FONT FIX**. Branch tip 9e17a75,
+pushed. 242 tests green, typecheck + COLD build green, schema pushed to prod Neon.
+Spec: `docs/superpowers/specs/2026-08-13-lock-app-user-management-design.md`.
+⭐ CONFIRM FIRST NEXT SESSION: did deploy 9e17a75 go READY? (17e0d2f ERRORed on the font bug below.)
+  lock-app project prj_y94ZneZEErOo6cCEh5PZFoummxC8 / team team_Z3BElgYbbdVXocdCUDBwjD9F.
+⭐ FONT FIX (2026-08-13, commit 9e17a75) — **UNRELATED to the Users page; it broke the first deploy.**
+  Deploy 17e0d2f failed: `src/app/layout.tsx · An error occurred in next/font · TypeError: Cannot read
+  properties of null (reading '1')` at @next/font/google/loader.js:112. ROOT CAUSE: next/font/google
+  DOWNLOADS from fonts.googleapis.com AT BUILD TIME and caches in .next/cache — so only a COLD-cache build
+  makes the request. Log said "Previous build caches not available" (prev deploy was 2026-07-04, 5 weeks
+  earlier → Vercel cache expired) → refetch returned something loader.js couldn't parse → build died. Local
+  builds passed the whole time because .next/cache still had the fonts — that's why it slipped through.
+  FIX: vendored latin-subset woff2 into `lock-app/src/fonts` (11 faces: Space Grotesk 400-700, IBM Plex Sans
+  400-700, IBM Plex Mono 400-600) + `next/font/local` in src/app/layout.tsx. Build is now HERMETIC (no network,
+  no cache dependency). Same faces/weights; CSS var names unchanged so globals.css untouched. VERIFIED by
+  deleting .next and building COLD (the actual Vercel condition) — green, 11 faces emitted.
+  ⚠️ LATIN SUBSET ONLY — non-Latin text would fall back to system-ui. Nothing in the app needs it; eyeball once.
+  LESSON: a warm local `npm run build` does NOT prove a Vercel build. Delete .next first when fonts/assets
+  are in play.
 WHAT SHIPPED:
   • `/users` page (global, beside /settings): roster w/ Name·Email·Role·Access·Status·Last sign-in.
     `users.view` = read-only (manager/attendant); `users.manage` = mutate (super_admin only). Sidebar "Users"
@@ -28,13 +45,22 @@ WHAT SHIPPED:
     invited) — makes admin actions auditable, the standing shared-mailbox concern. writeAudit propertyId now
     optional (portfolio-wide actions; column was already nullable).
 VERIFY LIVE NEXT (sandbox can't reach the deployed app):
+  0. Deploy 9e17a75 READY? + typography still correct (font swap) on dashboard/room detail.
   1. Add a throwaway user → invite email arrives → they can request a code and sign in.
   2. Disable them → OTP refused AND any open session booted on next click. Enable → works again.
   3. Scope a user to one property → their sidebar/portfolio shows only that property.
   4. Delete → leaves the list, "Show deleted" restores them, Activity log still names them.
   5. Try to disable yourself / the last super_admin → expect the friendly refusal modal, not a crash.
+  6. ⚠️ `APP_URL` — invite emails link to https://lock.rentstayable.com. If that domain's SSL still isn't
+     live (was "generating" back in June, never confirmed), set APP_URL on the lock-app Vercel project to
+     the lock-app-dusky.vercel.app alias or every invite link 404s/warns.
 THEN (now UI work, no code changes): scope Gerardo + Crystal down from super_admin, fix the placeholder
   display names (Admin/Kate/Rob), decide whether shared admin@rentstayable.com keeps full super_admin.
+STILL OPEN from 2026-07-04 (untouched this session, sandbox can't reach TTLock/CB): backup-code rename
+  live check (LL<room>-<name> in app AND TTLock), rotate old backups to refresh names, eyeball By-zone on
+  Kissimmee West odd/even + inferred Jax West/Davenport. Also still open: SMS via Akia, User Logs page
+  (NOTE: the Users page does NOT cover this — it's a per-user view of the EventLog, still to build),
+  guest-email copy sign-off.
 --- prior ---
 RESUME HERE (2026-07-18) — Light session, read-only user audit (no code changes). Confirmed lock-app is
 **OTP-only — NO passwords stored** (User model has no password/passwordHash; login = 6-digit Resend OTP minted
