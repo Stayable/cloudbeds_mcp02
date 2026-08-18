@@ -3,7 +3,7 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
-RESUME HERE (2026-08-17) — **LOGIN OTP DOUBLE-CODE BUG FOUND + FIXED. NOT COMMITTED, NOT PUSHED.**
+RESUME HERE (2026-08-17) — **LOGIN OTP DOUBLE-CODE BUG FOUND + FIXED. COMMITTED + PUSHED (branch tip c1bc175).**
 BK's report: "two codes emailed almost instantly, the first works, the 2nd doesn't." Initially read as a
 GUEST DOOR CODE — it is NOT. It's the **lock-app login OTP**. Proven from prod Neon: 0 `guest_email_sent`
 and 0 `passcode_created` in 30 days, so no guest has been emailed any code at all.
@@ -30,8 +30,14 @@ FIX (TDD — 10 new tests written failing first; 252/252 green, tsc clean, COLD 
     was ever requested. createOtp returns early on a duplicate request inside the window (no 2nd mint, no 2nd email).
   • `src/app/login/page.tsx` — `busy` state; both buttons disabled + "Sending…"/"Checking…" while in flight.
     This is the actual trigger; the 15s server window is the backstop.
-⭐ NEXT: commit + push (lock-app is Git-connected → auto-deploys to prod). Then verify live: request a code,
-  double-click "Send code" → expect ONE email; sign in with it. If two ever arrive again, BOTH now work.
+PUSHED 2026-08-17: a9566c3..c1bc175 on claude/brave-maxwell-756k2c, tree clean vs origin. lock-app is
+  Git-connected → auto-deploy triggered. ⭐ VERIFY LIVE NEXT (sandbox blocks api.vercel.com):
+  1. Did the deploy go READY? This is also the FIRST real signal on the 2026-08-13 font fix — the deploy before
+     it (17e0d2f) ERRORed on next/font. Local COLD build (rm -rf .next) is green, so the hermetic fix holds.
+  2. On the deployed app: double-click "Send code" → expect ONE email; sign in with it. If two ever arrive
+     again, BOTH codes now work.
+  NOTE: createOtp's 15s suppression keys off existing rows, so duplicate pairs ALREADY in MagicLink are
+  unaffected — they simply both work now instead of one being dead.
 SEPARATE FINDING (not this bug, but flagged to BK): the guest door-code path has issued NOTHING in 30 days —
   0 passcode_created, 0 guest emails. Log is 73,007 `no_lock_mapped` + 9,045 `awaiting_payment` (consistent with
   rollout state: 5 active backup codes, 0 active guest codes) + **115 `passcode_create_failed`, ALL the same
