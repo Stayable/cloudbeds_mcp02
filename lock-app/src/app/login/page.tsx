@@ -8,19 +8,35 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<"email" | "code">("email");
   const [error, setError] = useState("");
+  // The request takes a moment and the button used to look untouched, so people
+  // pressed it again — sending a second code and two emails at once. Hold the
+  // submit until the round-trip finishes.
+  const [busy, setBusy] = useState(false);
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setError("");
-    await fetch("/api/auth/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-    setStage("code");
+    setBusy(true);
+    try {
+      await fetch("/api/auth/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      setStage("code");
+    } finally {
+      setBusy(false);
+    }
   }
   async function verify(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setError("");
-    const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code }) });
-    if (res.ok) router.push("/portfolio");
-    else setError((await res.json().catch(() => ({}))).error ?? "That code didn't work. Try again.");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code }) });
+      if (res.ok) router.push("/portfolio");
+      else setError((await res.json().catch(() => ({}))).error ?? "That code didn't work. Try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -49,14 +65,14 @@ export default function LoginPage() {
               <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>We&apos;ll email you a one-time code.</p>
               <label className="lbl" style={{ margin: "26px 0 8px" }}>WORK EMAIL</label>
               <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="field" style={{ width: "100%", height: 46 }} placeholder="you@rentstayable.com" />
-              <button type="submit" className="btn btn-primary" style={{ marginTop: 14, width: "100%", height: 46 }}>Send code</button>
+              <button type="submit" disabled={busy} className="btn btn-primary" style={{ marginTop: 14, width: "100%", height: 46, opacity: busy ? 0.65 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Sending…" : "Send code"}</button>
             </form>
           ) : (
             <form onSubmit={verify}>
               <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>Enter the 6-digit code sent to {email}.</p>
               <label className="lbl" style={{ margin: "26px 0 8px" }}>6-DIGIT CODE</label>
               <input inputMode="numeric" pattern="\d{6}" required value={code} onChange={(e) => setCode(e.target.value)} className="field mono" style={{ width: "100%", height: 52, fontSize: 22, letterSpacing: ".3em", textAlign: "center" }} />
-              <button type="submit" className="btn btn-navy" style={{ marginTop: 16, width: "100%", height: 46 }}>Verify &amp; continue</button>
+              <button type="submit" disabled={busy} className="btn btn-navy" style={{ marginTop: 16, width: "100%", height: 46, opacity: busy ? 0.65 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Checking…" : "Verify & continue"}</button>
               <button type="button" onClick={() => setStage("email")} className="btn btn-ghost" style={{ marginTop: 8, width: "100%", height: 42, border: "none" }}>Use a different email</button>
             </form>
           )}

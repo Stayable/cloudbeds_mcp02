@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
-import { generateOtpCode, otpMatches } from "./otp";
+import { generateOtpCode, pickOtpMatch, isDuplicateOtpRequest } from "./otp";
 import { sendOtpEmail } from "./email";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-change-me";
@@ -22,6 +22,15 @@ export async function createOtp(email: string): Promise<void> {
   // Disabled/archived users are refused SILENTLY — identical to the unknown-email
   // path above, so the response shape never reveals whether an account exists.
   if (!user || user.disabledAt || user.archivedAt) return;
+  // A double-submit of "Send code" (two POSTs milliseconds apart) would otherwise
+  // mint two different codes and email both at once. Treat a repeat press inside
+  // the dedupe window as the same request: the first code's email is already on
+  // its way and stays valid. A later press still mints a fresh code.
+  const outstanding = await prisma.magicLink.findFirst({
+    where: { email, used: false },
+    orderBy: { createdAt: "desc" },
+  });
+  if (isDuplicateOtpRequest(outstanding, new Date())) return;
   const code = generateOtpCode();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   await prisma.magicLink.create({
@@ -41,15 +50,20 @@ export async function verifyOtp(
   email: string,
   code: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const link = await prisma.magicLink.findFirst({
+  // Check the typed code against EVERY outstanding code for this address, not just
+  // the newest — if two were minted at once, either email's code must work.
+  const outstanding = await prisma.magicLink.findMany({
     where: { email, used: false },
     orderBy: { createdAt: "desc" },
+    take: 10,
   });
-  if (!link || !link.userId) return { success: false, error: "Invalid code" };
-  if (!otpMatches({ code: link.code, used: link.used, expiresAt: link.expiresAt }, code, new Date())) {
-    return { success: false, error: "Invalid or expired code" };
-  }
-  await prisma.magicLink.update({ where: { id: link.id }, data: { used: true } });
+  const link = pickOtpMatch(outstanding, code, new Date());
+  // One message for "no such code" and "wrong code" alike, so the response never
+  // reveals whether a code was ever requested for this address.
+  if (!link || !link.userId) return { success: false, error: "Invalid or expired code" };
+  // Burn every outstanding code for this address, not only the one redeemed: a
+  // sibling from the same request must not stay live after a successful sign-in.
+  await prisma.magicLink.updateMany({ where: { email, used: false }, data: { used: true } });
 
   // Re-check access at redemption: a code minted before the account was disabled
   // must not still buy a session.

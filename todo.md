@@ -3,6 +3,43 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+RESUME HERE (2026-08-17) — **LOGIN OTP DOUBLE-CODE BUG FOUND + FIXED. NOT COMMITTED, NOT PUSHED.**
+BK's report: "two codes emailed almost instantly, the first works, the 2nd doesn't." Initially read as a
+GUEST DOOR CODE — it is NOT. It's the **lock-app login OTP**. Proven from prod Neon: 0 `guest_email_sent`
+and 0 `passcode_created` in 30 days, so no guest has been emailed any code at all.
+ROOT CAUSE (two defects, both required for the symptom):
+  1. ⭐ **`verifyOtp` only ever examined the NEWEST unused code** (`findFirst … orderBy createdAt desc`) and
+     compared the typed code against that ONE row. A sibling code from the same double-submit is unused,
+     unexpired and valid — but never looked at → "Invalid or expired code". Exactly one of the two emailed
+     codes could ever work; which one lands in the inbox first is Resend delivery-order luck (hence
+     "first works, second doesn't").
+  2. **Nothing stopped a second code being minted.** The login "Send code" button had NO pending state —
+     it looked untouched during the round-trip, so people press it again → 2 POSTs → 2 MagicLink rows →
+     2 different codes → 2 emails.
+EVIDENCE (prod Neon MagicLink, 45d): 4 of ~6 sign-in attempts produced a duplicate pair — gaps 177ms / 0ms /
+  0ms / 395ms (latest 2026-08-17T21:39Z). In EVERY pair the older row stayed `used=false` (live and rejected).
+  The 0ms gaps are still a double-click: the first POST hits a cold serverless start, the second a warm pool,
+  so both reach `magicLink.create` in the same millisecond.
+FIX (TDD — 10 new tests written failing first; 252/252 green, tsc clean, COLD build green after rm -rf .next):
+  • `src/lib/otp.ts` — new pure `pickOtpMatch(outstanding, input, now)` (checks EVERY unused/unexpired code for
+    the address, not just the newest) + `isDuplicateOtpRequest(latest, now, windowMs)` + `OTP_DEDUPE_WINDOW_MS`
+    = 15s (swallows a double-click; a genuine "I never got it" resend >15s still mints fresh).
+  • `src/lib/auth.ts` — verifyOtp now findMany(take 10) → pickOtpMatch; on success burns ALL that address's
+    outstanding codes via updateMany (a sibling must not stay live 15 min after sign-in); the two error strings
+    ("Invalid code" / "Invalid or expired code") collapsed to ONE so the response can't reveal whether a code
+    was ever requested. createOtp returns early on a duplicate request inside the window (no 2nd mint, no 2nd email).
+  • `src/app/login/page.tsx` — `busy` state; both buttons disabled + "Sending…"/"Checking…" while in flight.
+    This is the actual trigger; the 15s server window is the backstop.
+⭐ NEXT: commit + push (lock-app is Git-connected → auto-deploys to prod). Then verify live: request a code,
+  double-click "Send code" → expect ONE email; sign in with it. If two ever arrive again, BOTH now work.
+SEPARATE FINDING (not this bug, but flagged to BK): the guest door-code path has issued NOTHING in 30 days —
+  0 passcode_created, 0 guest emails. Log is 73,007 `no_lock_mapped` + 9,045 `awaiting_payment` (consistent with
+  rollout state: 5 active backup codes, 0 active guest codes) + **115 `passcode_create_failed`, ALL the same
+  error `errcode=-2012 The Device is not connected`** (last 2026-08-12T18:00Z). If guest codes were expected to
+  be flowing, they are not — that -2012 cluster is the thing to chase.
+STILL UNCONFIRMED from 2026-08-13: whether deploy 9e17a75 went READY on Vercel (sandbox blocks api.vercel.com).
+  Local COLD build is green again today, so the font fix holds; the deploy state itself is still unverified.
+--- prior ---
 RESUME HERE (2026-08-13) — **USERS PAGE SHIPPED** (`/users`) + **BUILD-BREAKING FONT FIX**. Branch tip 9e17a75,
 pushed. 242 tests green, typecheck + COLD build green, schema pushed to prod Neon.
 Spec: `docs/superpowers/specs/2026-08-13-lock-app-user-management-design.md`.

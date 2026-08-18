@@ -18,3 +18,45 @@ export function otpMatches(
   if (stored.expiresAt < now) return false;
   return stored.code === input.trim();
 }
+
+/**
+ * Pick the outstanding code the user actually typed.
+ *
+ * A sign-in request can mint more than one code — a double-submit of "Send code"
+ * sends two emails seconds apart, each with different digits. Verification must
+ * therefore consider EVERY unused, unexpired code for the address, not just the
+ * newest: checking only the newest rejects the other email's perfectly valid code
+ * as "invalid or expired", which is exactly what a guest sees as "the first code
+ * worked, the second one didn't". Returns the matching row, or null.
+ */
+export function pickOtpMatch<T extends { code: string | null; used: boolean; expiresAt: Date }>(
+  outstanding: T[],
+  input: string,
+  now: Date,
+): T | null {
+  return outstanding.find((link) => otpMatches(link, input, now)) ?? null;
+}
+
+/**
+ * Window in which a repeat "Send code" is treated as the same request rather than
+ * a new one. Long enough to swallow a double-click (and the two near-simultaneous
+ * POSTs it produces on a cold serverless start), short enough that a guest who
+ * genuinely never received the mail still gets a fresh code on the next press.
+ */
+export const OTP_DEDUPE_WINDOW_MS = 15_000;
+
+/**
+ * True when this "Send code" press is a duplicate of one already in flight — an
+ * unexpired code was minted for the address moments ago, so its email is already
+ * on its way. Suppressing the second mint is what stops the guest receiving two
+ * codes at once. Pure; `latest` is the newest unused row (null if none).
+ */
+export function isDuplicateOtpRequest(
+  latest: { createdAt: Date; expiresAt: Date } | null | undefined,
+  now: Date,
+  windowMs: number = OTP_DEDUPE_WINDOW_MS,
+): boolean {
+  if (!latest) return false;
+  if (latest.expiresAt < now) return false;
+  return now.getTime() - latest.createdAt.getTime() < windowMs;
+}
