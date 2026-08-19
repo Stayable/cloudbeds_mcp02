@@ -71,7 +71,11 @@ export default function LoginPage() {
             <form onSubmit={verify}>
               <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 6 }}>Enter the 6-digit code sent to {email}.</p>
               <label className="lbl" style={{ margin: "26px 0 8px" }}>6-DIGIT CODE</label>
-              <input inputMode="numeric" pattern="\d{6}" required value={code} onChange={(e) => setCode(e.target.value)} className="field mono" style={{ width: "100%", height: 52, fontSize: 22, letterSpacing: ".3em", textAlign: "center" }} />
+              {/* Strip everything but digits on the way in: a code pasted out of
+                  the email (or out of an SMS preview) can arrive with spaces,
+                  dashes or a trailing newline, and pattern="\d{6}" would block
+                  the submit with a useless "match the requested format". */}
+              <input inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className="field mono" style={{ width: "100%", height: 52, fontSize: 22, letterSpacing: ".3em", textAlign: "center" }} />
               <button type="submit" disabled={busy} className="btn btn-navy" style={{ marginTop: 16, width: "100%", height: 46, opacity: busy ? 0.65 : 1, cursor: busy ? "default" : "pointer" }}>{busy ? "Checking…" : "Verify & continue"}</button>
               <button type="button" onClick={() => setStage("email")} className="btn btn-ghost" style={{ marginTop: 8, width: "100%", height: 42, border: "none" }}>Use a different email</button>
             </form>

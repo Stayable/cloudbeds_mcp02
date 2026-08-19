@@ -25,6 +25,15 @@ describe("buildOtpEmail", () => {
   it("includes the code in the HTML body", () => {
     expect(built.html).toContain(code);
   });
+  // The code has to survive copy → paste into a pattern="\d{6}" field, so it
+  // must render as ONE text run. Per-digit table cells copy as "0 4 8 2 1 3".
+  it("renders the code as a single contiguous run, not per-digit cells", () => {
+    expect(built.html).toContain(`>${code}<`);
+    expect(built.html).not.toMatch(new RegExp(code.split("").join("<")));
+  });
+  it("puts the code alone on its own line in the plain-text body", () => {
+    expect(built.text).toMatch(new RegExp(`\\n${code}\\n`));
+  });
   it("includes the code in the plain-text body", () => {
     expect(built.text).toContain(code);
   });

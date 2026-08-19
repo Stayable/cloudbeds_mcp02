@@ -57,7 +57,7 @@ function esc(s: string): string {
 /** Outer email chrome: canvas bg, hidden preheader, navy header + logo, gold hairline, footer. */
 export function emailShell(opts: { preheader: string; body: string; sub?: boolean; footer?: string }): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="format-detection" content="telephone=no,date=no,address=no,email=no"></head>
 <body style="margin:0;padding:0;background:#E7ECF3;">
   <span style="display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;">${esc(opts.preheader)}</span>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E7ECF3;padding:28px 12px;"><tr><td align="center">
@@ -85,6 +85,29 @@ export function codeCard(label: string, code: string, note?: string): string {
   return `<div style="padding:24px 44px 8px;"><div style="background:#fff;border:1px solid #EAEEF4;border-top:3px solid ${GOLD};border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;">
     <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${FAINT};font-weight:700;margin-bottom:18px;">${esc(label)}</div>
     <table role="presentation" cellspacing="8" cellpadding="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;"><tr>${cells}</tr></table>
+    ${note ? `<div style="font-size:13px;color:${MUTED};margin-top:16px;">${esc(note)}</div>` : ""}
+  </div></div>`;
+}
+
+/**
+ * Same card, but the code is ONE contiguous text run instead of per-digit table
+ * cells — so selecting it copies `048213`, not `0 4 8 2 1 3`.
+ *
+ * Every mail client puts a tab or space between `<td>`s when you copy across
+ * them, and the sign-in field is `pattern="\d{6}"`, so a pasted boxed code is
+ * rejected outright. Use this wherever the code is meant to be PASTED (login
+ * OTP); keep `codeCard` where it's read off the screen and typed on a keypad
+ * (guest door codes). Wide letter-spacing keeps the boxed look's legibility
+ * without splitting the string — spacing is presentation only and never lands
+ * in the clipboard. `user-select:all` makes one click/tap grab the whole code
+ * in clients that honour it.
+ */
+export function copyableCodeCard(label: string, code: string, note?: string): string {
+  // letter-spacing also trails the LAST glyph, so the run sits visually left of
+  // centre; the extra left padding puts it back on the middle.
+  return `<div style="padding:24px 44px 8px;"><div style="background:#fff;border:1px solid #EAEEF4;border-top:3px solid ${GOLD};border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;">
+    <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${FAINT};font-weight:700;margin-bottom:18px;">${esc(label)}</div>
+    <div style="display:inline-block;background:#F5F8FD;border:1.5px solid #DCE7F5;border-bottom:3px solid ${BLUE};border-radius:12px;padding:12px 24px 12px 34px;"><span style="font-family:${MONO};font-size:32px;font-weight:700;color:${NAVY};letter-spacing:.3em;line-height:1.3;-webkit-user-select:all;user-select:all;white-space:nowrap;">${esc(code)}</span></div>
     ${note ? `<div style="font-size:13px;color:${MUTED};margin-top:16px;">${esc(note)}</div>` : ""}
   </div></div>`;
 }

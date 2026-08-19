@@ -1,0 +1,218 @@
+<style>
+  :root{--navy:#041E42;--ink:#08152B;--blue:#1E8FF2;--gold:#FDDA24;--canvas:#EEF1F6;--muted:#6B7686;--line:#dfe4ec;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--canvas);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.55;}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 64px;}
+  .top h1{font-size:30px;letter-spacing:-.01em;margin:0 0 8px;text-wrap:balance;}
+  .top h1::after{content:"";display:block;width:54px;height:3px;background:var(--gold);margin-top:14px;border-radius:2px;}
+  .top p{color:var(--muted);font-size:15px;max-width:60ch;margin:14px 0 0;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:28px;margin-top:36px;}
+  @media(max-width:880px){.grid{grid-template-columns:1fr;}}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(8,21,43,.04);}
+  .card-h{padding:18px 20px;border-bottom:1px solid var(--line);background:#fbfcfe;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--navy);background:#eaf3fe;border:1px solid #d4e7fb;padding:4px 10px;border-radius:999px;}
+  .subj{margin-top:12px;font-size:15px;font-weight:600;color:var(--ink);}
+  .subj-l{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:8px;}
+  .meta{margin-top:6px;font-size:12px;color:var(--muted);}
+  iframe{width:100%;height:560px;border:0;background:#F4F6FA;display:block;}
+</style>
+<div class="wrap"><header class="top"><h1>Stayable — Email Templates</h1><p>Generated from the production builders by <code>lock-app/scripts/render-email-preview.mts</code> — do not hand-edit. Logo loads from the lock-app production alias.</p></header><div class="grid"><section class="card"><header class="card-h"><span class="tag">7. OTP sign-in (staff)</span><div class="subj"><span class="subj-l">Subject</span> Your Stayable Locks sign-in code: 482915</div><div class="meta">From <strong>Stayable Locks &lt;admin@rentstayable.com&gt;</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;Your Stayable sign-in code is 482915 — it expires in 15 minutes.&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        &lt;div style=&quot;font-size:11px;letter-spacing:.34em;color:#6FB4F5;margin-top:10px;font-weight:700;&quot;&gt;L O C K S&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:40px 44px 8px;&quot;&gt;
+      &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.2;color:#041E42;margin:0 0 8px;font-weight:700;&quot;&gt;Your sign-in code&lt;/h2&gt;
+      &lt;p style=&quot;font-size:16px;line-height:1.6;color:#44505F;margin:0 0 6px;&quot;&gt;Enter this code to sign in to Stayable Locks. It expires in &lt;strong style=&quot;color:#041E42;&quot;&gt;15 minutes&lt;/strong&gt;.&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div style=&quot;padding:24px 44px 8px;&quot;&gt;&lt;div style=&quot;background:#fff;border:1px solid #EAEEF4;border-top:3px solid #FDDA24;border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8A94A6;font-weight:700;margin-bottom:18px;&quot;&gt;Your sign-in code&lt;/div&gt;
+    &lt;div style=&quot;display:inline-block;background:#F5F8FD;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:12px;padding:12px 24px 12px 34px;&quot;&gt;&lt;span style=&quot;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:32px;font-weight:700;color:#041E42;letter-spacing:.3em;line-height:1.3;-webkit-user-select:all;user-select:all;white-space:nowrap;&quot;&gt;482915&lt;/span&gt;&lt;/div&gt;
+    &lt;div style=&quot;font-size:13px;color:#6B7280;margin-top:16px;&quot;&gt;Copy the code and paste it straight into the sign-in screen.&lt;/div&gt;
+  &lt;/div&gt;&lt;/div&gt;
+    &lt;div style=&quot;padding:14px 44px 4px;&quot;&gt;&lt;p style=&quot;font-size:14px;line-height:1.6;color:#6B7280;margin:0;&quot;&gt;If you didn't request this, you can safely ignore this email — no one can sign in without the code.&lt;/p&gt;&lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Sent by Stayable Locks&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="7. OTP sign-in (staff)"></iframe></section><section class="card"><header class="card-h"><span class="tag">1. New code generated (check-in)</span><div class="subj"><span class="subj-l">Subject</span> You're all set — your door code for Room 239</div><div class="meta">From <strong>Stayable &lt;blake@rentstayable.com&gt;</strong> · Reply-to <strong>blake@rentstayable.com</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;Your door code for Room 239 is ready — 482915. Works through checkout.&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:40px 44px 8px;&quot;&gt;
+    &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.18;color:#041E42;margin:0 0 8px;font-weight:700;&quot;&gt;Welcome, Marcus!&lt;/h2&gt;
+    &lt;p style=&quot;font-size:17px;line-height:1.55;color:#44505F;margin:0;&quot;&gt;Your door code for &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt; at Stayable Lakeland is ready.&lt;/p&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:24px 44px 8px;&quot;&gt;&lt;div style=&quot;background:#fff;border:1px solid #EAEEF4;border-top:3px solid #FDDA24;border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8A94A6;font-weight:700;margin-bottom:18px;&quot;&gt;Your door code&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; cellspacing=&quot;8&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto;border-collapse:separate;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;4&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;8&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;2&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;9&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;1&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;5&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+    
+  &lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#1E8FF2;font-weight:700;margin-bottom:16px;&quot;&gt;How to use it&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;1&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Go to &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt;.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;2&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Tap the keypad to wake it.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:4px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;3&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Enter &lt;strong style=&quot;color:#041E42;&quot;&gt;482915&lt;/strong&gt;, then press the unlock key.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:20px 44px 4px;&quot;&gt;&lt;div style=&quot;background:#F4F6FA;border-radius:12px;padding:18px 20px;&quot;&gt;
+    &lt;div style=&quot;font-size:15px;color:#041E42;font-weight:700;margin-bottom:4px;&quot;&gt;Your stay: Fri, Jun 27 – Mon, Jun 30&lt;/div&gt;
+    &lt;div style=&quot;font-size:14px;line-height:1.55;color:#6B7280;&quot;&gt;This code is unique to your stay — please don't share it. It stops working automatically at checkout.&lt;/div&gt;
+  &lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;&lt;p style=&quot;font-size:15px;line-height:1.5;color:#44505F;margin:0;&quot;&gt;Code not working? &lt;a href=&quot;mailto:blake@rentstayable.com&quot; style=&quot;color:#1E8FF2;text-decoration:none;font-weight:600;&quot;&gt;Reply to this email.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Stayable · blake@rentstayable.com&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="1. New code generated (check-in)"></iframe></section><section class="card"><header class="card-h"><span class="tag">2. Checkout (no code)</span><div class="subj"><span class="subj-l">Subject</span> Thank you for staying with us at Stayable Lakeland</div><div class="meta">From <strong>Stayable &lt;blake@rentstayable.com&gt;</strong> · Reply-to <strong>blake@rentstayable.com</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;Thank you for staying with us at Stayable Lakeland — safe travels!&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:44px 44px 8px;text-align:center;&quot;&gt;
+      &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:1.15;color:#041E42;margin:0 0 16px;font-weight:700;&quot;&gt;Thank you, Marcus.&lt;/h2&gt;
+      &lt;p style=&quot;font-size:17px;line-height:1.65;color:#44505F;margin:0 auto 16px;max-width:430px;&quot;&gt;We hope you enjoyed your stay in &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt; at Stayable Lakeland. Your door code has now been deactivated as your stay has ended.&lt;/p&gt;
+      &lt;div style=&quot;width:48px;height:3px;background:#FDDA24;border-radius:2px;margin:22px auto;&quot;&gt;&lt;/div&gt;
+      &lt;p style=&quot;font-size:17px;line-height:1.65;color:#44505F;margin:0 auto;max-width:430px;&quot;&gt;It was a pleasure hosting you — we'd love to welcome you back anytime. &lt;strong style=&quot;color:#041E42;&quot;&gt;Safe travels!&lt;/strong&gt;&lt;/p&gt;
+    &lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Stayable · blake@rentstayable.com&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="2. Checkout (no code)"></iframe></section><section class="card"><header class="card-h"><span class="tag">3. Room change (new code)</span><div class="subj"><span class="subj-l">Subject</span> Your new door code for Room 239 at Stayable Lakeland</div><div class="meta">From <strong>Stayable &lt;blake@rentstayable.com&gt;</strong> · Reply-to <strong>blake@rentstayable.com</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;You've moved to Room 239 — here's your new door code, 482915.&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:40px 44px 8px;&quot;&gt;
+    &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:29px;line-height:1.18;color:#041E42;margin:0 0 8px;font-weight:700;&quot;&gt;Thanks for your patience, Marcus.&lt;/h2&gt;
+    &lt;p style=&quot;font-size:17px;line-height:1.55;color:#44505F;margin:0;&quot;&gt;You've been moved to &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt; at Stayable Lakeland. Here is your new door code.&lt;/p&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:24px 44px 8px;&quot;&gt;&lt;div style=&quot;background:#fff;border:1px solid #EAEEF4;border-top:3px solid #FDDA24;border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8A94A6;font-weight:700;margin-bottom:18px;&quot;&gt;Your new door code&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; cellspacing=&quot;8&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto;border-collapse:separate;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;4&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;8&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;2&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;9&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;1&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;5&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+    &lt;div style=&quot;font-size:13px;color:#6B7280;margin-top:16px;&quot;&gt;Your previous room's code no longer works.&lt;/div&gt;
+  &lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#1E8FF2;font-weight:700;margin-bottom:16px;&quot;&gt;How to use it&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;1&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Go to &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt;.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;2&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Tap the keypad to wake it.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:4px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;3&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Enter &lt;strong style=&quot;color:#041E42;&quot;&gt;482915&lt;/strong&gt;, then press the unlock key.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:20px 44px 4px;&quot;&gt;&lt;div style=&quot;background:#F4F6FA;border-radius:12px;padding:18px 20px;&quot;&gt;
+    &lt;div style=&quot;font-size:15px;color:#041E42;font-weight:700;margin-bottom:4px;&quot;&gt;Your stay: Fri, Jun 27 – Mon, Jun 30&lt;/div&gt;
+    &lt;div style=&quot;font-size:14px;line-height:1.55;color:#6B7280;&quot;&gt;This code is unique to your stay — please don't share it. It stops working automatically at checkout.&lt;/div&gt;
+  &lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;&lt;p style=&quot;font-size:15px;line-height:1.5;color:#44505F;margin:0;&quot;&gt;Code not working? &lt;a href=&quot;mailto:blake@rentstayable.com&quot; style=&quot;color:#1E8FF2;text-decoration:none;font-weight:600;&quot;&gt;Reply to this email.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Stayable · blake@rentstayable.com&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="3. Room change (new code)"></iframe></section><section class="card"><header class="card-h"><span class="tag">4. Rotated code</span><div class="subj"><span class="subj-l">Subject</span> Your door code has been updated — Room 239</div><div class="meta">From <strong>Stayable &lt;blake@rentstayable.com&gt;</strong> · Reply-to <strong>blake@rentstayable.com</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;Your door code for Room 239 has been updated — new code: 482915.&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:40px 44px 8px;&quot;&gt;
+    &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:29px;line-height:1.18;color:#041E42;margin:0 0 8px;font-weight:700;&quot;&gt;Your door code has been updated&lt;/h2&gt;
+    &lt;p style=&quot;font-size:17px;line-height:1.55;color:#44505F;margin:0;&quot;&gt;Your door code for &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt; at Stayable Lakeland has been updated. Please use the new code below — any previous code no longer works.&lt;/p&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:24px 44px 8px;&quot;&gt;&lt;div style=&quot;background:#fff;border:1px solid #EAEEF4;border-top:3px solid #FDDA24;border-radius:14px;box-shadow:0 4px 14px rgba(4,30,66,.06);padding:26px;text-align:center;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8A94A6;font-weight:700;margin-bottom:18px;&quot;&gt;Your new door code&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; cellspacing=&quot;8&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; align=&quot;center&quot; style=&quot;margin:0 auto;border-collapse:separate;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;4&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;8&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;2&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;9&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;1&lt;/td&gt;&lt;td style=&quot;width:46px;height:58px;background:#fff;border:1.5px solid #DCE7F5;border-bottom:3px solid #1E8FF2;border-radius:10px;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:700;color:#041E42;text-align:center;vertical-align:middle;&quot;&gt;5&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+    
+  &lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;
+    &lt;div style=&quot;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#1E8FF2;font-weight:700;margin-bottom:16px;&quot;&gt;How to use it&lt;/div&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;1&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Go to &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt;.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:12px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;2&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Tap the keypad to wake it.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+    &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot; border=&quot;0&quot; style=&quot;margin-bottom:4px;&quot;&gt;&lt;tr&gt;
+      &lt;td width=&quot;42&quot; valign=&quot;top&quot;&gt;&lt;div style=&quot;width:30px;height:30px;border-radius:50%;background:#041E42;color:#fff;font-size:15px;font-weight:700;text-align:center;line-height:30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;3&lt;/div&gt;&lt;/td&gt;
+      &lt;td valign=&quot;top&quot; style=&quot;font-size:16px;line-height:1.5;color:#44505F;padding-top:4px;&quot;&gt;Enter &lt;strong style=&quot;color:#041E42;&quot;&gt;482915&lt;/strong&gt;, then press the unlock key.&lt;/td&gt;
+    &lt;/tr&gt;&lt;/table&gt;
+  &lt;/div&gt;&lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;&lt;p style=&quot;font-size:15px;line-height:1.5;color:#44505F;margin:0;&quot;&gt;Code not working? &lt;a href=&quot;mailto:blake@rentstayable.com&quot; style=&quot;color:#1E8FF2;text-decoration:none;font-weight:600;&quot;&gt;Reply to this email.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Stayable · blake@rentstayable.com&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="4. Rotated code"></iframe></section><section class="card"><header class="card-h"><span class="tag">5. Code revoked only (safeguard)</span><div class="subj"><span class="subj-l">Subject</span> Your door code for Room 239 has been deactivated</div><div class="meta">From <strong>Stayable &lt;blake@rentstayable.com&gt;</strong> · Reply-to <strong>blake@rentstayable.com</strong></div></header><iframe sandbox srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;&lt;meta name=&quot;format-detection&quot; content=&quot;telephone=no,date=no,address=no,email=no&quot;&gt;&lt;/head&gt;
+&lt;body style=&quot;margin:0;padding:0;background:#E7ECF3;&quot;&gt;
+  &lt;span style=&quot;display:none;max-height:0;overflow:hidden;opacity:0;color:#E7ECF3;font-size:1px;&quot;&gt;An update about your door code for Room 239 at Stayable Lakeland.&lt;/span&gt;
+  &lt;table role=&quot;presentation&quot; width=&quot;100%&quot; cellpadding=&quot;0&quot; cellspacing=&quot;0&quot; style=&quot;background:#E7ECF3;padding:28px 12px;&quot;&gt;&lt;tr&gt;&lt;td align=&quot;center&quot;&gt;
+    &lt;div style=&quot;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 34px rgba(4,30,66,.12);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;&quot;&gt;
+      &lt;div style=&quot;background:#041E42;padding:26px 0;text-align:center;&quot;&gt;
+        &lt;img src=&quot;https://lock-app-dusky.vercel.app/brand/stayable-email-logo.png&quot; alt=&quot;Stayable&quot; height=&quot;28&quot; style=&quot;height:28px;display:block;margin:0 auto;color:#fff;font-weight:700;&quot;&gt;
+        
+      &lt;/div&gt;
+      &lt;div style=&quot;height:3px;background:#FDDA24;font-size:0;line-height:0;&quot;&gt;&amp;nbsp;&lt;/div&gt;
+      &lt;div style=&quot;padding:40px 44px 8px;&quot;&gt;
+      &lt;h2 style=&quot;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;color:#041E42;margin:0 0 14px;font-weight:700;&quot;&gt;A quick update on your door code&lt;/h2&gt;
+      &lt;p style=&quot;font-size:17px;line-height:1.6;color:#44505F;margin:0 0 16px;&quot;&gt;Marcus, the door code for &lt;strong style=&quot;color:#041E42;&quot;&gt;Room 239&lt;/strong&gt; at Stayable Lakeland has been deactivated and no longer works.&lt;/p&gt;
+      &lt;p style=&quot;font-size:16px;line-height:1.6;color:#44505F;margin:0;&quot;&gt;If you still need access, please contact the front desk or reply to this email and we'll sort it out right away.&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div style=&quot;padding:22px 44px 8px;&quot;&gt;&lt;div style=&quot;background:#F4F6FA;border-radius:12px;padding:18px 20px;text-align:center;&quot;&gt;
+      &lt;div style=&quot;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#8A94A6;font-weight:700;&quot;&gt;Room 239 · code inactive&lt;/div&gt;
+    &lt;/div&gt;&lt;/div&gt;
+    &lt;div style=&quot;padding:18px 44px 4px;&quot;&gt;&lt;p style=&quot;font-size:15px;line-height:1.5;color:#44505F;margin:0;&quot;&gt;Need help right now? &lt;a href=&quot;mailto:blake@rentstayable.com&quot; style=&quot;color:#1E8FF2;text-decoration:none;font-weight:600;&quot;&gt;Reply to this email.&lt;/a&gt;&lt;/p&gt;&lt;/div&gt;
+      &lt;div style=&quot;border-top:1px solid #EAEEF4;padding:22px 44px 30px;text-align:center;&quot;&gt;
+        &lt;p style=&quot;font-size:14px;line-height:1.5;color:#6B7280;margin:0;&quot;&gt;Questions? Just reply to this email and a real person will help.&lt;/p&gt;
+        &lt;p style=&quot;font-size:12px;color:#8A94A6;margin:10px 0 0;&quot;&gt;Stayable · blake@rentstayable.com&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;" title="5. Code revoked only (safeguard)"></iframe></section></div></div>

@@ -9,6 +9,17 @@ export function generateOtpCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
+/**
+ * Normalise a typed or pasted code to bare digits. A code copied out of the
+ * email can carry spaces, a dash, or a trailing newline; none of that changes
+ * which code the user meant, so it must not decide whether they get in. Codes
+ * are digits-only by construction (generateOtpCode), so dropping non-digits
+ * cannot make two different codes collide.
+ */
+export function normalizeOtpInput(input: string): string {
+  return input.replace(/\D/g, "");
+}
+
 export function otpMatches(
   stored: { code: string | null; used: boolean; expiresAt: Date },
   input: string,
@@ -16,7 +27,7 @@ export function otpMatches(
 ): boolean {
   if (!stored.code || stored.used) return false;
   if (stored.expiresAt < now) return false;
-  return stored.code === input.trim();
+  return stored.code === normalizeOtpInput(input);
 }
 
 /**

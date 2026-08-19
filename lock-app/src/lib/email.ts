@@ -5,7 +5,7 @@
  * thin I/O wrapper. Mirrors client-portal's email approach but Stayable-branded.
  */
 
-import { emailShell, codeCard } from "./guest-email";
+import { emailShell, copyableCodeCard } from "./guest-email";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const NAVY = "#041E42"; // Stayable brand navy, matches the app headers
@@ -26,13 +26,16 @@ export function senderFrom(configured?: string): string {
 
 export function buildOtpEmail(code: string): { subject: string; html: string; text: string } {
   const subject = `Your Stayable Locks sign-in code: ${code}`;
-  // Shares the design system with the guest emails (emailShell + codeCard), with
-  // the "LOCKS" sub-wordmark and a staff-facing, utilitarian tone.
+  // Shares the design system with the guest emails (emailShell + the code card),
+  // with the "LOCKS" sub-wordmark and a staff-facing, utilitarian tone. Uses
+  // copyableCodeCard, NOT the per-digit codeCard: this code gets pasted into the
+  // sign-in field, and copying boxed digits yields "0 4 8 2 1 3", which the
+  // field's \d{6} pattern rejects.
   const body = `<div style="padding:40px 44px 8px;">
       <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.2;color:${NAVY};margin:0 0 8px;font-weight:700;">Your sign-in code</h2>
       <p style="font-size:16px;line-height:1.6;color:#44505F;margin:0 0 6px;">Enter this code to sign in to Stayable Locks. It expires in <strong style="color:${NAVY};">15 minutes</strong>.</p>
     </div>
-    ${codeCard("Your sign-in code", code)}
+    ${copyableCodeCard("Your sign-in code", code, "Copy the code and paste it straight into the sign-in screen.")}
     <div style="padding:14px 44px 4px;"><p style="font-size:14px;line-height:1.6;color:#6B7280;margin:0;">If you didn't request this, you can safely ignore this email — no one can sign in without the code.</p></div>`;
   const html = emailShell({
     preheader: `Your Stayable sign-in code is ${code} — it expires in 15 minutes.`,
@@ -40,7 +43,10 @@ export function buildOtpEmail(code: string): { subject: string; html: string; te
     sub: true,
     footer: "Sent by Stayable Locks",
   });
-  const text = `Stayable Locks\n\nYour sign-in code is: ${code}\n\nIt expires in 15 minutes.\n\nIf you didn't request this, you can safely ignore this email.`;
+  // The code sits alone on its own line — no label, no punctuation touching it —
+  // so a double-click or line-select in a plain-text client copies exactly the
+  // six digits and nothing else.
+  const text = `Stayable Locks\n\nYour sign-in code is:\n\n${code}\n\nIt expires in 15 minutes.\n\nIf you didn't request this, you can safely ignore this email.`;
   return { subject, html, text };
 }
 

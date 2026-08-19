@@ -3,6 +3,68 @@
 ## ACTIVE: TTLock ↔ Cloudbeds Middleware + Lock App (2026-06-12)
 Spec: `docs/superpowers/specs/2026-06-12-ttlock-cloudbeds-middleware-design.md`
 
+AKIA — ANSWERED + REPLY SENT (2026-08-19). **Path is settled. Awaiting Data Write API docs. No code touched.**
+Round one (sent 2026-08-18, draft `outputs/AkiaAPIInquiry_Stayable_081826.md`) came back:
+  • "We sync guest and reservation data FROM Cloudbeds, so Akia's data is identical to Cloudbeds — for
+    reading guests/reservations, use the Cloudbeds API directly. Most Cloudbeds fields are available as
+    merge fields in Akia."  ← aimed at the wrong direction; we are WRITING into Akia, not reading out.
+  • ⭐ "Custom Fields ARE writable via our API, and the data set in them is available as merge fields in
+    messages. What is your use case?"  ← this is the green light. Path chosen.
+DECIDED PATH (supersedes the "template off the Cloudbeds NOTE" idea — that is now DROPPED):
+  a **`door_code` custom field**, written by the middleware through Akia's **Data Write API**, consumed as a
+  variable in a comms template, and readable by Akia's **AI Agent** so it can answer a guest who asks for
+  their code. The note-merge shortcut was rejected on purpose: that same Cloudbeds note field also carries
+  our operational failure lines (`⚠ Door code NOT set for … lock offline`), which must never reach a guest.
+REPLY SENT 2026-08-19 (BK sent it) — draft `outputs/AkiaReply_DoorCodes_081926.md`. Deliberately SHORT,
+three asks only: (1) Data Write API docs + how we get credentials; (2) what identifier the write keys on —
+Cloudbeds reservationID or an Akia-side ID, and if Akia-side, how we resolve it from a CB reservationID;
+(3) can the AI Agent read custom fields when it answers a guest.
+CUT FROM THE REPLY ON BK'S CALL — do NOT re-raise these with Akia, they are ours to solve:
+  per-stay vs per-guest scoping, code rotation, re-send on room change. One shared `door_code` field is
+  enough: the middleware **overwrites** it on a new code and **clears** it when there is no reservation.
+⭐ WHEN THE DOCS LAND — the build is small and localized:
+  `middleware/lib/passcode-sync.ts` — write `door_code` right next to the existing `postReservationNote(...)`
+  call in the create path (~line 428), and CLEAR it in the checkout/cancel path that already revokes the
+  TTLock PIN. Same best-effort discipline as the note: a failed Akia write must never lose the PIN.
+  Still unanswered and worth knowing before wiring: write→merge-field latency, and whether a message can be
+  TRIGGERED by a custom-field update (matters because an offline lock can delay a code past check-in).
+TRACKED: Smartsheet Action Items Staging row **749**, status **Waiting On**, owner BK.
+
+RESUME HERE (2026-08-19) — **OTP EMAIL: CODE IS NOW COPY-PASTABLE. DONE, TESTED, UNCOMMITTED.**
+BK's ask: "make sure the format of the OTP code is copy pastable directly to the field."
+ROOT CAUSE: `codeCard()` rendered the code as SIX SEPARATE `<td>` cells (one per digit). Every mail client
+inserts a tab/space between table cells when you copy across them, so the clipboard got `0 4 8 2 1 3`.
+The login field is `pattern="\d{6}"` → the browser blocks submit with the useless "match the requested
+format" message. The boxed look was actively breaking paste.
+FIX (5 files + mirror; 35 tests green in otp/email/guest-email, `tsc --noEmit` clean in lock-app AND middleware):
+  • `lock-app/src/lib/guest-email.ts` — NEW `copyableCodeCard(label, code, note?)`: same card chrome (gold
+    top rule, white card) but the code is ONE contiguous text run — mono 32px, `letter-spacing:.3em`,
+    `user-select:all`, on a tinted rounded plate. Letter-spacing is presentation only and never reaches the
+    clipboard, so it keeps the boxed look's legibility without splitting the string. Extra LEFT padding
+    (34px vs 24px) compensates for the trailing letter-space so the run sits optically centred.
+  • same file — added `<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">`
+    to `emailShell`, so iOS/Outlook stop autolinking the digits as a phone number (helps guest emails too).
+  • `lock-app/src/lib/email.ts` — OTP email swapped `codeCard` → `copyableCodeCard` + note "Copy the code and
+    paste it straight into the sign-in screen."; plain-text body now puts the code ALONE on its own line so a
+    double-click in a text client grabs exactly six digits.
+  • `lock-app/src/app/login/page.tsx` — input strips non-digits on the way in
+    (`e.target.value.replace(/\D/g,"").slice(0,6)`), plus `maxLength={6}` and `autoComplete="one-time-code"`.
+    Belt-and-braces: ANY paste shape now works even from an old email still sitting in an inbox.
+  • `lock-app/src/lib/otp.ts` — NEW pure `normalizeOtpInput()`; `otpMatches` compares digits-only instead of
+    bare `.trim()`. Safe because `generateOtpCode` is digits-only by construction, so stripping separators
+    cannot make two codes collide. Server-side backstop for API callers that skip the form.
+  • `middleware/lib/guest-email.ts` — MIRRORED (the two guest-email.ts files must stay identical). Its two
+    app-specific header lines were restored after the copy.
+DELIBERATE NON-CHANGE: guest DOOR-CODE emails keep the per-digit boxes. Those codes are read off a screen
+and typed on a keypad — there is no field to paste into — and the boxes are the design-canvas look.
+ALSO SHIPPED: `lock-app/scripts/render-email-preview.mts` — regenerates repo-root `email-preview.html` from
+the PRODUCTION builders (`npx tsx scripts/render-email-preview.mts` from `lock-app/`). The gallery had been
+hand-assembled once and went stale immediately; it is now reproducible and byte-stable (fixed sample data,
+no Date.now()/random). Regenerated: 6 cards. It also FIXED a wrong label — the OTP card had been showing the
+guest sender; it now shows the real `Stayable Locks <admin@rentstayable.com>` with no reply-to.
+NOT DONE: nothing is committed. No live send was tested — verify by requesting a real sign-in code and
+pasting it from Outlook/Gmail/iOS Mail into the field.
+
 RESUME HERE (2026-08-17) — **LOGIN OTP DOUBLE-CODE BUG FOUND + FIXED. COMMITTED + PUSHED (branch tip c1bc175).**
 BK's report: "two codes emailed almost instantly, the first works, the 2nd doesn't." Initially read as a
 GUEST DOOR CODE — it is NOT. It's the **lock-app login OTP**. Proven from prod Neon: 0 `guest_email_sent`
